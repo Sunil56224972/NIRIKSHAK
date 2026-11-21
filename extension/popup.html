@@ -12,6 +12,12 @@
   .HIGH { color: #a3201b; font-weight: 700; }
   .MEDIUM { color: #8a5a00; font-weight: 700; }
   .LOW { color: #2f6b2f; font-weight: 700; }
+  .linked { margin-top: 4px; font-weight: 600; color: #a3201b; }
+  .cfg { margin-top: 10px; border-top: 1px solid #d2d4cc; padding-top: 6px; font-size: 11px; }
+  .cfg summary { cursor: pointer; color: #47525e; }
+  .cfg input { margin: 6px 0 4px; font-size: 11px; }
+  .cfg button { padding: 3px 8px; font-size: 11px; background: #e8e9e4; color: #1d232b; border-color: #aeb3aa; }
+  #srv-msg { margin-top: 4px; color: #2f6b2f; }
 </style>
 </head>
 <body>
@@ -20,6 +26,12 @@
   <button id="go" type="button">Check address</button>
   <button id="full" type="button">Full check / report</button>
   <div id="out"></div>
+  <details class="cfg">
+    <summary>Server settings</summary>
+    <input id="srv" type="url" placeholder="https://nirikshak-ten.vercel.app">
+    <button id="save-srv" type="button">Save server</button>
+    <div id="srv-msg"></div>
+  </details>
   <script src="popup.js"></script>
 </body>
 </html>

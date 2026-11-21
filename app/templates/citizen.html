@@ -10,8 +10,11 @@
 <section class="panel">
   <header><h2>Submission details</h2></header>
   <div class="body">
-    <form method="post" action="/report" enctype="multipart/form-data" data-busy="Analysing your submission…">
+    <form method="post" action="/report" enctype="multipart/form-data" data-busy="Analysing your submission…" data-chunk-scope="citizen">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="staged_upload_id" value="">
+      <input type="hidden" name="staged_chunks" value="0">
+      <input type="hidden" name="staged_filename" value="">
       <div class="row">
         <div class="field"><label>What are you reporting?</label>
           <select name="kind" id="kind-select">

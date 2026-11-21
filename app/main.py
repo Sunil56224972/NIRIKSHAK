@@ -206,6 +206,63 @@ async def _read_upload(file: UploadFile, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
+CHUNK_MAX_BYTES = 3 * 1024 * 1024
+_UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _staging_key(scope: str, upload_id: str, idx: int) -> str:
+    return f"_staging/{scope}/{upload_id}/{idx:04d}.part"
+
+
+def _save_staged_chunk(db, scope: str, upload_id: str, idx: int, data: bytes) -> None:
+    key = _staging_key(scope, upload_id, idx)
+    try:
+        db.upload(key, data, "application/octet-stream")
+        return
+    except DBError:
+        if config.IS_SERVERLESS:
+            raise
+    d = config.EVIDENCE_DIR / "_staging" / scope / upload_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{idx:04d}.part").write_bytes(data)
+
+
+def _assemble_staged_upload(db, scope: str, upload_id: str, total_chunks: int, max_bytes: int) -> bytes:
+    if not _UPLOAD_ID_RE.fullmatch(upload_id) or not (1 <= total_chunks <= 64):
+        raise ValueError("Invalid staged upload reference.")
+    local_dir = config.EVIDENCE_DIR / "_staging" / scope / upload_id
+    keys = [_staging_key(scope, upload_id, idx) for idx in range(total_chunks)]
+    parts: list[bytes] = []
+    total = 0
+    try:
+        for idx, key in enumerate(keys):
+            lp = local_dir / f"{idx:04d}.part"
+            if lp.exists():
+                chunk = lp.read_bytes()
+            else:
+                chunk = db.download(key)
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError(f"Uploaded file exceeds {max_bytes // (1024 * 1024)} MB limit.")
+            parts.append(chunk)
+        return b"".join(parts)
+    finally:
+        for idx, key in enumerate(keys):
+            lp = local_dir / f"{idx:04d}.part"
+            try:
+                lp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            try:
+                db.delete_object(key)
+            except DBError:
+                pass
+        try:
+            local_dir.rmdir()
+        except OSError:
+            pass
+
+
 def page(request: Request, tpl: str, ctx: dict | None = None, status: int = 200):
     ctx = dict(ctx or {})
     ctx.setdefault("user", getattr(request.state, "user", None))
@@ -338,24 +395,77 @@ def analyze_form(request: Request, type: str = "message"):
     return page(request, "analyze.html", {"nav": "new", "kind": type, "form": {}})
 
 
+@app.post("/api/upload/chunk")
+async def upload_chunk(
+    request: Request,
+    scope: str = Form(...),
+    upload_id: str = Form(...),
+    chunk_index: int = Form(...),
+    total_chunks: int = Form(...),
+    csrf_token: str = Form(""),
+    chunk: UploadFile = File(...),
+):
+    if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
+        return JSONResponse({"error": "Cross-site request refused"}, 403)
+    origin = request.headers.get("origin") or request.headers.get("referer") or ""
+    if origin and urlsplit(origin).netloc.lower() not in _expected_hosts(request):
+        return JSONResponse({"error": "Cross-site request refused"}, 403)
+    try:
+        check_csrf(request, csrf_token)
+    except Forbidden:
+        return JSONResponse({"error": "Invalid or expired security token. Reload and try again."}, 403)
+
+    if scope == "officer":
+        if not auth.current_user(request):
+            return JSONResponse({"error": "Authentication required."}, 401)
+        max_chunks = min(64, max(1, (config.MAX_APK_BYTES // (2 * 1024 * 1024)) + 4))
+    elif scope == "citizen":
+        if public_limited(request, 80):
+            return JSONResponse({"error": "Too many upload requests from this connection."}, 429)
+        max_chunks = 16
+    else:
+        return JSONResponse({"error": "Invalid upload scope."}, 400)
+
+    if not _UPLOAD_ID_RE.fullmatch(upload_id) or not (0 <= chunk_index < total_chunks <= max_chunks):
+        return JSONResponse({"error": "Invalid chunk metadata."}, 400)
+    try:
+        data = await _read_upload(chunk, CHUNK_MAX_BYTES)
+        if not data:
+            return JSONResponse({"error": "Empty upload chunk."}, 400)
+        _save_staged_chunk(get_db(), scope, upload_id, chunk_index, data)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+    except DBError as exc:
+        return JSONResponse({"error": f"Staging storage error: {exc}"}, 502)
+    return JSONResponse({"ok": True, "chunk_index": chunk_index, "size": len(data)})
+
+
 @app.post("/analyze/{kind}")
 async def analyze_submit(request: Request, kind: str, text: str = Form(""), channel: str = Form("sms"),
                          sender: str = Form(""), url: str = Form(""), file: UploadFile | None = File(None),
-                         live: str = Form("0"), csrf_token: str = Form("")):
+                         staged_upload_id: str = Form(""), staged_chunks: int = Form(0),
+                         staged_filename: str = Form(""), live: str = Form("0"), csrf_token: str = Form("")):
     check_csrf(request, csrf_token)
     u = officer(request)
     if kind not in KIND_LABEL:
         return RedirectResponse("/analyze", 303)
     form = {"text": text, "channel": channel, "sender": sender, "url": url}
     upload = None
+    limit = config.MAX_APK_BYTES if kind == "apk" else 15 * 1024 * 1024
     if file is not None and file.filename:
-        limit = config.MAX_APK_BYTES if kind == "apk" else 15 * 1024 * 1024
         try:
             data = await _read_upload(file, limit)
         except ValueError as exc:
             return page(request, "analyze.html", {"nav": "new", "kind": kind, "form": form, "error": str(exc)}, 400)
         if data:
             upload = (file.filename, data)
+    elif staged_upload_id and staged_chunks > 0:
+        try:
+            data = _assemble_staged_upload(get_db(), "officer", staged_upload_id, staged_chunks, limit)
+        except (ValueError, DBError) as exc:
+            return page(request, "analyze.html", {"nav": "new", "kind": kind, "form": form, "error": str(exc)}, 400)
+        if data:
+            upload = (Path(staged_filename or "upload.apk").name, data)
     try:
         result = service.analyse(kind, text=text, channel=channel, sender=sender, url=url, upload=upload,
                                  run_live=live == "1")
@@ -830,7 +940,9 @@ def citizen_form(request: Request, kind: str = "", url: str = ""):
 @app.post("/report")
 async def citizen_submit(request: Request, kind: str = Form("message"), text: str = Form(""), url: str = Form(""),
                          channel: str = Form("sms"), sender: str = Form(""), name: str = Form(""), contact: str = Form(""),
-                         file: UploadFile | None = File(None), consent: str = Form(""), csrf_token: str = Form("")):
+                         file: UploadFile | None = File(None), staged_upload_id: str = Form(""),
+                         staged_chunks: int = Form(0), staged_filename: str = Form(""),
+                         consent: str = Form(""), csrf_token: str = Form("")):
     check_csrf(request, csrf_token)
     form = {"kind": kind, "text": text, "url": url, "channel": channel, "sender": sender, "name": name, "contact": contact}
     if public_limited(request, 15):
@@ -842,14 +954,21 @@ async def citizen_submit(request: Request, kind: str = Form("message"), text: st
         return page(request, "citizen.html", {"public": True, "form": form,
                                               "error": "Please confirm the declaration before submitting."}, 400)
     upload = None
+    limit = 25 * 1024 * 1024 if kind == "apk" else 15 * 1024 * 1024
     if file is not None and file.filename:
-        limit = 25 * 1024 * 1024 if kind == "apk" else 15 * 1024 * 1024
         try:
             data = await _read_upload(file, limit)
         except ValueError as exc:
             return page(request, "citizen.html", {"public": True, "form": form, "error": str(exc)}, 400)
         if data:
             upload = (file.filename, data)
+    elif staged_upload_id and staged_chunks > 0:
+        try:
+            data = _assemble_staged_upload(get_db(), "citizen", staged_upload_id, staged_chunks, limit)
+        except (ValueError, DBError) as exc:
+            return page(request, "citizen.html", {"public": True, "form": form, "error": str(exc)}, 400)
+        if data:
+            upload = (Path(staged_filename or "upload.apk").name, data)
     try:
         result = service.analyse(kind, text=text, channel=channel, sender=sender, url=url, upload=upload)
     except ValueError as exc:

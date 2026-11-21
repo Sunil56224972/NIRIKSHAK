@@ -55,6 +55,8 @@ MAX_APK_BYTES = int(os.getenv("NK_MAX_APK_MB", "150")) * 1024 * 1024
 
 GSB_API_KEY = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY", "").strip()
+CLOUD_OCR = os.getenv("NK_CLOUD_OCR", "1" if IS_SERVERLESS else "0") == "1"
 
 
 def _load_secret() -> str:

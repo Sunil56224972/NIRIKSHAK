@@ -1,4 +1,9 @@
-const DEFAULT_SERVER = "http://127.0.0.1:8000";
+const DEFAULT_SERVER = "https://nirikshak-ten.vercel.app";
+
+function normalizeServer(raw) {
+  const s = (raw || "").trim().replace(/\/+$/, "");
+  return /^https?:\/\/[^/\s]+/i.test(s) ? s : DEFAULT_SERVER;
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -11,7 +16,8 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId === "nirikshak-check-link" && info.linkUrl) {
     const cfg = await chrome.storage.local.get({ server: DEFAULT_SERVER });
-    const target = `${cfg.server.replace(/\/$/, "")}/check?u=${encodeURIComponent(info.linkUrl)}`;
+    const server = normalizeServer(cfg.server);
+    const target = `${server}/check?u=${encodeURIComponent(info.linkUrl)}`;
     chrome.tabs.create({ url: target });
   }
 });

@@ -43,10 +43,10 @@ class Supabase:
     # ---- low level -------------------------------------------------------
     def _call(self, method: str, url: str, *, params=None, body=None, headers=None, raw=None,
               timeout: float = 20) -> requests.Response:
-        h = {"Content-Type": "application/json"}
+        data = raw if raw is not None else (json.dumps(body, default=str) if body is not None else None)
+        h = {"Content-Type": "application/json"} if data is not None else {}
         if headers:
             h.update(headers)
-        data = raw if raw is not None else (json.dumps(body, default=str) if body is not None else None)
         try:
             r = self._session().request(method, url, params=params, data=data, headers=h, timeout=timeout)
         except requests.RequestException as exc:
@@ -129,6 +129,10 @@ class Supabase:
     def download(self, path: str) -> bytes:
         url = f"{self.storage}/object/{config.STORAGE_BUCKET}/{quote(path)}"
         return self._call("GET", url, timeout=120).content
+
+    def delete_object(self, path: str) -> None:
+        url = f"{self.storage}/object/{config.STORAGE_BUCKET}/{quote(path)}"
+        self._call("DELETE", url, timeout=30)
 
     def ping(self) -> None:
         self.select("nk_users", limit=1, columns="id")

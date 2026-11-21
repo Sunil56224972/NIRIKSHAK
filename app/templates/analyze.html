@@ -14,8 +14,11 @@
 </div>
 <section class="panel">
   <div class="body">
-  <form method="post" action="/analyze/{{ kind }}" enctype="multipart/form-data" data-busy="Analysing…">
+  <form method="post" action="/analyze/{{ kind }}" enctype="multipart/form-data" data-busy="Analysing…"{% if kind == 'apk' %} data-chunk-scope="officer"{% endif %}>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="staged_upload_id" value="">
+    <input type="hidden" name="staged_chunks" value="0">
+    <input type="hidden" name="staged_filename" value="">
     {% if kind == 'message' %}
       <div class="row">
         <div class="field"><label>Channel</label>

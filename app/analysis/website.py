@@ -9,6 +9,7 @@ from __future__ import annotations
 import email
 import email.policy
 import html as html_mod
+import io
 import os
 import re
 import subprocess
@@ -16,8 +17,10 @@ import sys
 import tempfile
 from urllib.parse import urljoin, urlsplit
 
+import requests
 from bs4 import BeautifulSoup
 
+from .. import config
 from . import iocs as ioc_mod
 from . import urlscan
 from .scoring import Findings
@@ -101,9 +104,43 @@ _WIN_OCR_PS = (
 )
 
 
-def _ocr(data: bytes) -> str | None:
+def _cloud_ocr(data: bytes) -> str | None:
+    if not (config.LIVE_CHECKS and (config.OCR_SPACE_API_KEY or config.CLOUD_OCR)):
+        return None
     try:
-        import io
+        from PIL import Image
+        payload = data
+        fname, mime = "screenshot.png", "image/png"
+        if len(payload) > 950_000:
+            im = Image.open(io.BytesIO(data)).convert("RGB")
+            im.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=85, optimize=True)
+            payload = buf.getvalue()
+            fname, mime = "screenshot.jpg", "image/jpeg"
+        r = requests.post(
+            "https://api.ocr.space/parse/image",
+            headers={"apikey": config.OCR_SPACE_API_KEY or "helloworld"},
+            files={"file": (fname, payload, mime)},
+            data={"language": "eng", "OCREngine": "2", "scale": "true"},
+            timeout=max(20.0, config.NET_TIMEOUT * 2.5),
+        )
+        if not r.ok:
+            return None
+        res = r.json()
+        if res.get("IsErroredOnProcessing"):
+            return None
+        parsed = "\n".join(
+            (item.get("ParsedText") or "")
+            for item in (res.get("ParsedResults") or [])
+        ).strip()
+        return parsed if parsed else None
+    except Exception:
+        return None
+
+
+def _ocr(data: bytes, *, allow_cloud: bool = True) -> str | None:
+    try:
         import pytesseract
         from PIL import Image
         return pytesseract.image_to_string(Image.open(io.BytesIO(data)), lang="eng")
@@ -113,7 +150,6 @@ def _ocr(data: bytes) -> str | None:
     if sys.platform == "win32":
         tmp_path = None
         try:
-            import io
             from PIL import Image
             img = Image.open(io.BytesIO(data)).convert("RGB")
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
@@ -140,18 +176,25 @@ def _ocr(data: bytes) -> str | None:
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+
+    if allow_cloud:
+        cloud = _cloud_ocr(data)
+        if cloud is not None:
+            return cloud
     return None
 
 
-def load_upload(filename: str, data: bytes) -> tuple[str, str]:
+def load_upload(filename: str, data: bytes, *, allow_cloud: bool = True) -> tuple[str, str]:
     """Return (html_or_text, kind) for an uploaded saved page."""
     name = filename.lower()
     if name.endswith((".mhtml", ".mht")):
         return _from_mhtml(data), "html"
     if name.endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp")):
-        text = _ocr(data)
+        text = _ocr(data, allow_cloud=allow_cloud)
         if text is None:
-            raise ValueError("Screenshot OCR is unavailable on this host (install Tesseract OCR or upload the saved .html / .mhtml page).")
+            raise ValueError("Screenshot OCR is unavailable on this host (enable live checks / Tesseract OCR, or upload a saved .html / .mhtml page).")
+        if not text.strip():
+            raise ValueError("No readable text was detected in the uploaded screenshot.")
         return text, "text"
     if name.endswith((".html", ".htm", ".xhtml", ".php", ".asp", ".aspx")):
         return data.decode("utf-8", "replace"), "html"
@@ -297,7 +340,7 @@ def analyze(url: str | None = None, upload: tuple[str, bytes] | None = None, run
     elif upload:
         name, data = upload
         is_img = name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".bmp"))
-        html, kind = load_upload(name, data)
+        html, kind = load_upload(name, data, allow_cloud=run_live)
         ev_label = "Uploaded website screenshot (OCR analysed)" if is_img else "Uploaded saved page"
         evidence.append((ev_label, name, data, "application/octet-stream"))
         m = re.search(r"<!--\s*saved from url=\(\d+\)(\S+)\s*-->", html[:2000]) or \
