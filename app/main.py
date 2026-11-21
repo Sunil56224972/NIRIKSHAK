@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import re
+import sys
 import threading
 import time
 from collections import defaultdict, deque
@@ -19,16 +20,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import auth, config, feeds, notice, report, service
-from .analysis import linkchart
-from .analysis.iocs import ETYPE_LABELS
-from .analysis.scoring import Findings
-from .db import DBError, get_db, ilike_term, in_list
+APP_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = str(APP_DIR.parent)
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 
-APP_DIR = Path(__file__).parent
+from app import auth, config, feeds, notice, report, service
+from app.analysis import linkchart
+from app.analysis.iocs import ETYPE_LABELS
+from app.analysis.scoring import Findings
+from app.db import DBError, get_db, ilike_term, in_list
+
 app = FastAPI(title="NIRIKSHAK", docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
-templates = Jinja2Templates(directory=APP_DIR / "templates")
+app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
 IST = timezone(timedelta(hours=5, minutes=30))
 
 STATUS_LABEL = {"open": "Open", "investigating": "Under investigation", "closed_fraud": "Closed — fraud confirmed",
@@ -55,11 +60,35 @@ templates.env.globals.update(APP_NAME=config.APP_NAME, UNIT_NAME=config.UNIT_NAM
                              KIND_LABEL=KIND_LABEL, ETYPE_LABELS=ETYPE_LABELS)
 
 
+def _is_https(request: Request) -> bool:
+    if request.url.scheme == "https":
+        return True
+    if config.TRUST_PROXY:
+        proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+        return proto == "https"
+    return False
+
+
+def _expected_hosts(request: Request) -> set[str]:
+    hosts: set[str] = set()
+    raw = [request.url.netloc, request.headers.get("host", "")]
+    if config.TRUST_PROXY:
+        raw.append(request.headers.get("x-forwarded-host", "").split(",")[0].strip())
+    for h in raw:
+        h = h.strip().lower()
+        if not h:
+            continue
+        hosts.add(h)
+        if h.endswith(":443") or h.endswith(":80"):
+            hosts.add(h.rsplit(":", 1)[0])
+    return hosts
+
+
 # ----------------------------------------------------------------------------- middleware
 class Guard(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if config.config_problems() and not path.startswith("/static"):
+        if config.config_problems() and not path.startswith("/static") and path != "/health":
             return templates.TemplateResponse(request, "config_error.html",
                                               {"problems": config.config_problems()}, status_code=503)
         csrf = request.cookies.get(auth.CSRF_COOKIE, "")
@@ -73,16 +102,17 @@ class Guard(BaseHTTPMiddleware):
             if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
                 return Response("Cross-site request refused", status_code=403)
             origin = request.headers.get("origin") or request.headers.get("referer") or ""
-            if origin and urlsplit(origin).netloc != request.url.netloc:
+            if origin and urlsplit(origin).netloc.lower() not in _expected_hosts(request):
                 return Response("Cross-site request refused", status_code=403)
         resp = await call_next(request)
+        https = _is_https(request)
         if need_csrf_cookie:
             resp.set_cookie(
                 auth.CSRF_COOKIE,
                 csrf,
                 httponly=True,
                 samesite="strict",
-                secure=request.url.scheme == "https",
+                secure=https,
                 path="/",
                 max_age=config.SESSION_HOURS * 3600,
             )
@@ -96,7 +126,7 @@ class Guard(BaseHTTPMiddleware):
             "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
             "form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
         )
-        if request.url.scheme == "https":
+        if https:
             resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         if not path.startswith("/static"):
             resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
@@ -269,7 +299,7 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
     dest = next if next.startswith("/") and not next.startswith("//") else "/"
     resp = RedirectResponse(dest, 303)
     resp.set_cookie(auth.COOKIE, auth.make_session(u), httponly=True, samesite="strict",
-                    secure=request.url.scheme == "https", path="/", max_age=config.SESSION_HOURS * 3600)
+                    secure=_is_https(request), path="/", max_age=config.SESSION_HOURS * 3600)
     return resp
 
 
@@ -539,7 +569,10 @@ def evidence_download(request: Request, ev_id: int):
                 data = p.read_bytes()
                 break
     if data is None and e["storage_path"]:
-        data = db.download(e["storage_path"])
+        try:
+            data = db.download(e["storage_path"])
+        except DBError:
+            data = None
     if data is None:
         return page(request, "message.html", {"heading": "Evidence unavailable", "text": "File not found in storage."}, 404)
     if hashlib.sha256(data).hexdigest() != e["sha256"]:

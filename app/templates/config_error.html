@@ -9,8 +9,11 @@
       <div class="body">
         <p>The server cannot start because the database connection is not configured:</p>
         <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
-        <p>Copy <code>.env.example</code> to <code>.env</code>, fill in the Supabase project URL and the
+        <p><b>Local / Docker:</b> copy <code>.env.example</code> to <code>.env</code>, fill in the Supabase project URL and
           <b>service_role</b> key (Supabase dashboard → Project Settings → API Keys), then restart.</p>
+        <p><b>Vercel / Cloud:</b> add <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>
+          (or <code>SUPABASE_API_KEY</code> + <code>NK_DB_SECRET</code>) under
+          <em>Project Settings → Environment Variables</em>, then redeploy.</p>
         <p class="mini">The service_role key stays on this server. It is never sent to browsers.</p>
       </div>
     </div>

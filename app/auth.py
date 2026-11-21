@@ -50,10 +50,15 @@ def password_problem(pw: str) -> str | None:
     return None
 
 
-_DUMMY_HASH = hash_password("dummy-timing-guard-placeholder")
+_DUMMY_HASH: str | None = None
 
 
 def verify_dummy(password: str) -> None:
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        with _lock:
+            if _DUMMY_HASH is None:
+                _DUMMY_HASH = hash_password("dummy-timing-guard-placeholder")
     verify_password(password, _DUMMY_HASH)
 
 
@@ -130,6 +135,11 @@ def clear_failures(ip: str) -> None:
 
 
 def client_ip(request: Request) -> str:
+    if config.TRUST_PROXY:
+        for hdr in ("x-vercel-forwarded-for", "x-real-ip", "x-forwarded-for"):
+            val = request.headers.get(hdr, "").strip()
+            if val:
+                return val.split(",")[0].strip()[:64]
     return request.client.host if request.client else ""
 
 

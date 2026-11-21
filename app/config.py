@@ -1,6 +1,9 @@
 """Runtime configuration. Everything sensitive comes from .env, never from source."""
+import hashlib
+import hmac
 import os
 import secrets
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,9 +11,29 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-DATA_DIR = BASE_DIR / "data"
+IS_SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+TRUST_PROXY = IS_SERVERLESS or os.getenv("NK_TRUST_PROXY", "0") == "1"
+
+
+def _resolve_data_dir() -> Path:
+    custom = os.getenv("NK_DATA_DIR", "").strip()
+    if custom:
+        candidates = [Path(custom)]
+    elif IS_SERVERLESS:
+        candidates = [Path(tempfile.gettempdir()) / "nirikshak"]
+    else:
+        candidates = [BASE_DIR / "data", Path(tempfile.gettempdir()) / "nirikshak"]
+    for cand in candidates:
+        try:
+            (cand / "evidence").mkdir(parents=True, exist_ok=True)
+            return cand
+        except OSError:
+            continue
+    return Path(tempfile.gettempdir()) / "nirikshak"
+
+
+DATA_DIR = _resolve_data_dir()
 EVIDENCE_DIR = DATA_DIR / "evidence"
-EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_SERVICE_KEY = (
@@ -38,12 +61,22 @@ def _load_secret() -> str:
     env = os.getenv("NK_SECRET_KEY", "").strip()
     if env:
         return env
-    path = DATA_DIR / "secret.key"
-    if path.exists():
-        return path.read_text().strip()
-    value = secrets.token_urlsafe(48)
-    path.write_text(value)
-    return value
+    if not IS_SERVERLESS:
+        path = DATA_DIR / "secret.key"
+        try:
+            if path.exists():
+                val = path.read_text().strip()
+                if val:
+                    return val
+            value = secrets.token_urlsafe(48)
+            path.write_text(value)
+            return value
+        except OSError:
+            pass
+    seed = "|".join(p for p in (SUPABASE_URL, SUPABASE_SERVICE_KEY, NK_DB_SECRET) if p)
+    if seed:
+        return hmac.new(b"nirikshak-session-secret-v1", seed.encode("utf-8"), hashlib.sha256).hexdigest()
+    return secrets.token_urlsafe(48)
 
 
 SECRET_KEY = _load_secret()
@@ -53,9 +86,9 @@ SESSION_HOURS = 10
 def config_problems() -> list[str]:
     problems = []
     if not SUPABASE_URL:
-        problems.append("SUPABASE_URL is not set in .env")
+        problems.append("SUPABASE_URL is not set in environment / .env")
     if not SUPABASE_SERVICE_KEY:
-        problems.append("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_API_KEY is not set in .env")
+        problems.append("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_API_KEY is not set in environment / .env")
     elif not NK_DB_SECRET and (
         SUPABASE_SERVICE_KEY.startswith("sb_publishable_")
         or '"role":"anon"' in _jwt_payload(SUPABASE_SERVICE_KEY)

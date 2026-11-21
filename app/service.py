@@ -277,7 +277,10 @@ def _evidence_local(case_id: int, name: str, data: bytes) -> str:
 
 def store_evidence(db: Supabase, case_id: int, label: str, name: str, data: bytes, mime: str) -> dict:
     sha = hashlib.sha256(data).hexdigest()
-    _evidence_local(case_id, f"{sha[:12]}_{name}", data)
+    try:
+        _evidence_local(case_id, f"{sha[:12]}_{name}", data)
+    except OSError:
+        pass
     storage_path = ""
     try:
         storage_path = db.upload(f"case-{case_id}/{sha[:12]}_{re.sub(r'[^A-Za-z0-9._-]', '_', name)[-80:]}", data,
