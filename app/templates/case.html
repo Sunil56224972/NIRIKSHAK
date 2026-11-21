@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% from "_m.html" import risk, status, indicators %}
+{% block title %}{{ c.case_no }}{% endblock %}
+{% block content %}
+{% set d = r.details or {} %}
+{% set ur = d.url_report or {} %}
+{% set net = d.net or ur.net or {} %}
+{% set info = d.info or ur.info or {} %}
+
+<div class="pagehead">
+  <div class="sub"><a href="/cases">Case register</a> / {{ c.case_no }}</div>
+  <div class="actions">
+    <a class="btn" href="/cases/{{ c.id }}/report.pdf">Download report (PDF)</a>
+    <a class="btn plain" href="/cases/{{ c.id }}/notice.txt">Nodal notice (.txt)</a>
+    <a class="btn plain" href="/cases/{{ c.id }}/export.json">Export JSON</a>
+  </div>
+</div>
+
+<div class="verdict {{ c.risk_level }}">
+  <div class="score">
+    <div class="big">{{ c.risk_score }}</div><div class="of">out of 100</div>
+    <div>{{ risk(c.risk_level) }}</div>
+    <progress class="meter" max="100" value="{{ c.risk_score }}"></progress>
+  </div>
+  <div class="meta">
+    <div class="mini">{{ c.case_no }} · {{ c.kind|kind }}{% if c.channel %} · {{ c.channel }}{% endif %}</div>
+    <h1>{{ c.title }}</h1>
+    <div class="facts">
+      <span>Category <b>{{ c.category or 'Not classified' }}</b></span>
+      <span>Status {{ status(c.status) }}</span>
+      <span>Received <b>{{ c.created_at|ist }}</b></span>
+      <span>Source <b>{% if c.source == 'citizen' %}Citizen portal{% if c.reporter_name %} — {{ c.reporter_name }}{% endif %}{% if c.reporter_contact %} ({{ c.reporter_contact }}){% endif %}{% else %}{{ submitter.rank if submitter }} {{ submitter.full_name if submitter }}{% endif %}</b></span>
+    </div>
+    {% if r.floor_reason %}<div class="mini bad-txt">Minimum score applied: {{ r.floor_reason }}</div>{% endif %}
+  </div>
+</div>
+
+<div class="cols">
+<div class="stack">
+
+  <section class="panel">
+    <header><h2>Why this assessment</h2><span class="aside">{{ r.indicators|length }} indicator{{ '' if r.indicators|length == 1 else 's' }} · weights add up to the score</span></header>
+    <div class="body tight">{% if r.indicators %}{{ indicators(r.indicators) }}{% else %}<div class="empty">No indicators.</div>{% endif %}</div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Extracted identifiers</h2><span class="aside">{{ entities|length }} linked to the intelligence index</span></header>
+    <div class="body tight">
+    {% if entities %}
+      <table class="grid">
+        <tr><th>Type</th><th>Value</th><th>Where found</th><th class="num">Cases</th><th></th></tr>
+        {% for e in entities %}
+        <tr>
+          <td class="nowrap">{{ e.etype|etype }}</td>
+          <td><a class="mono" href="/identifiers/{{ e.id }}">{{ e.display }}</a></td>
+          <td class="dim">{{ e.context }}</td>
+          <td class="num">{% if e.case_count > 1 %}<b class="bad-txt">{{ e.case_count }}</b>{% else %}1{% endif %}</td>
+          <td><button type="button" class="btn plain small" data-copy="{{ e.display }}">copy</button></td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<div class="empty">No identifiers were found in this item.</div>{% endif %}
+    </div>
+  </section>
+
+  {% if linked or (r.intel and (r.intel.similar or r.intel.blocklist)) %}
+  <section class="panel">
+    <header><h2>Links to other records</h2></header>
+    <div class="body tight">
+      {% if linked %}
+      <table class="grid">
+        <tr><th>Shared identifier</th><th>Case</th><th>Type</th><th>Subject</th><th>Risk</th><th>Status</th></tr>
+        {% for l in linked %}
+        <tr>
+          <td><span class="dim">{{ l.entity.etype|etype }}</span><br><span class="mono">{{ l.entity.display }}</span></td>
+          <td class="nowrap"><a href="/cases/{{ l.case.id }}">{{ l.case.case_no }}</a></td>
+          <td>{{ l.case.kind|kind }}</td>
+          <td><span class="trunc">{{ l.case.title }}</span></td>
+          <td>{{ risk(l.case.risk_level) }}</td>
+          <td>{{ status(l.case.status) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if r.intel.similar %}
+      <h3 class="body">Similar content</h3>
+      <table class="grid">
+        <tr><th>Case</th><th>Subject</th><th class="num">Overlap</th><th>Risk</th><th>Status</th></tr>
+        {% for s in r.intel.similar %}
+        <tr><td class="nowrap"><a href="/cases/{{ s.case_id }}">{{ s.case_no }}</a></td><td><span class="trunc">{{ s.title }}</span></td>
+          <td class="num">{{ s.similarity }}%</td><td>{{ risk(s.risk_level) }}</td><td>{{ status(s.status) }}</td></tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if r.intel.blocklist %}
+      <h3 class="body">Blocklist matches at time of analysis</h3>
+      <table class="grid">
+        <tr><th>Value</th><th>Source</th><th>Note</th></tr>
+        {% for b in r.intel.blocklist %}<tr><td class="mono">{{ b.value }}</td><td>{{ b.source }}</td><td class="dim">{{ b.note }}</td></tr>{% endfor %}
+      </table>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# ---------------- type specific technical detail ---------------- #}
+  {% if d.apk %}{% set a = d.apk %}
+  <section class="panel">
+    <header><h2>Application</h2><span class="aside">static analysis</span></header>
+    <div class="body">
+      <div class="cols-2">
+        <table class="kv">
+          <tr><th>App label</th><td>{{ a.label }}</td></tr>
+          <tr><th>Package</th><td class="mono">{{ a.package }}</td></tr>
+          <tr><th>Version</th><td>{{ a.version_name }} ({{ a.version_code }})</td></tr>
+          <tr><th>SDK min / target</th><td>{{ a.min_sdk }} / {{ a.target_sdk }}</td></tr>
+          <tr><th>Launcher icon</th><td>{{ 'yes' if a.launcher_activity else 'none (hidden app)' }}</td></tr>
+          <tr><th>Components</th><td>{% for k, v in a.components.items() %}{{ v }} {{ k }}{{ ', ' if not loop.last }}{% endfor %}</td></tr>
+          <tr><th>DEX</th><td>{{ a.dex_files }} file(s), {{ '{:,}'.format(a.dex_strings) }} strings</td></tr>
+        </table>
+        <table class="kv">
+          <tr><th>File</th><td>{{ a.filename }}</td></tr>
+          <tr><th>Size</th><td>{{ '{:,}'.format(a.size) }} bytes</td></tr>
+          <tr><th>SHA-256</th><td class="mono">{{ a.sha256 }}</td></tr>
+          <tr><th>SHA-1</th><td class="mono">{{ a.sha1 }}</td></tr>
+          <tr><th>MD5</th><td class="mono">{{ a.md5 }}</td></tr>
+          <tr><th>Native libs</th><td class="mini">{{ a.native_libs|join(', ') or 'none' }}</td></tr>
+        </table>
+      </div>
+      {% if a.risky_permissions %}
+      <h3>Sensitive permissions</h3>
+      <table class="grid">
+        <tr><th>Permission</th><th>What it allows</th><th class="num">Weight</th></tr>
+        {% for p in a.risky_permissions|sort(attribute='weight', reverse=True) %}
+        <tr><td class="mono">{{ p.permission }}</td><td>{{ p.meaning }}{% if p.via == 'component' %} <span class="dim">(declared on a component)</span>{% endif %}</td><td class="num">{{ p.weight }}</td></tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+      {% if a.api_markers %}
+      <h3>Code markers</h3>
+      <table class="grid">{% for m in a.api_markers %}<tr><td class="mono">{{ m.marker }}</td><td>{{ m.meaning }}</td></tr>{% endfor %}</table>
+      {% endif %}
+      {% if a.receivers_of_interest %}
+      <h3>Broadcast receivers of interest</h3>
+      <table class="grid">{% for rc in a.receivers_of_interest %}<tr><td class="mono">{{ rc.name }}</td><td class="mono mini">{{ rc.actions|join(', ') }}</td></tr>{% endfor %}</table>
+      {% endif %}
+      <h3>Signing certificate{{ 's' if a.certificates|length != 1 }}</h3>
+      {% for ct in a.certificates %}
+      <table class="kv">
+        <tr><th>Scheme</th><td>{{ ct.scheme }} · {{ ct.key }}{{ ' · self-signed' if ct.self_signed }}</td></tr>
+        <tr><th>Subject</th><td class="mono">{{ ct.subject }}</td></tr>
+        <tr><th>Valid</th><td>{{ ct.not_before[:10] }} to {{ ct.not_after[:10] }} ({{ ct.validity_years }} yrs; created {{ ct.age_days }} days ago)</td></tr>
+        <tr><th>SHA-256</th><td class="mono">{{ ct.sha256 }}</td></tr>
+      </table>
+      {% else %}<p class="dim">No certificate found.</p>{% endfor %}
+      <details class="more"><summary>All declared permissions ({{ a.permissions|length }})</summary><pre class="raw">{{ a.permissions|join('\n') }}</pre></details>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if d.store %}
+  <section class="panel">
+    <header><h2>Play Store listing</h2></header>
+    <div class="body"><table class="kv">{% for k, v in d.store.items() %}<tr><th>{{ k|replace('_', ' ') }}</th><td class="mono">{{ v }}</td></tr>{% endfor %}</table></div>
+  </section>
+  {% endif %}
+
+  {% if d.page %}{% set p = d.page %}
+  <section class="panel">
+    <header><h2>Page content</h2></header>
+    <div class="body">
+      <table class="kv">
+        <tr><th>Title</th><td>{{ p.title or '—' }}</td></tr>
+        {% if d.original_url %}<tr><th>Original URL (from saved page)</th><td class="mono">{{ d.original_url }}</td></tr>{% endif %}
+        <tr><th>Forms</th><td>{% for fm in p.forms %}<div class="mini">{{ fm.method }} → <span class="mono">{{ fm.action or '(same page)' }}</span>{% if fm.sensitive %} · collects <b>{{ fm.sensitive|join(', ') }}</b>{% endif %}</div>{% else %}none{% endfor %}</td></tr>
+        <tr><th>Script flags</th><td>{{ p.script_flags|join(', ') or 'none' }}</td></tr>
+        <tr><th>APK links</th><td class="mono">{{ p.apk_links|join(', ') or 'none' }}</td></tr>
+        {% if p.note %}<tr><th>Note</th><td>{{ p.note }}</td></tr>{% endif %}
+      </table>
+      <details class="more"><summary>Visible text excerpt</summary><pre class="raw">{{ p.excerpt }}</pre></details>
+    </div>
+  </section>
+  {% elif d.fetch_note %}
+  <div class="note info">Page content not analysed: {{ d.fetch_note }}</div>
+  {% endif %}
+
+  {% if c.kind == 'message' %}
+  <section class="panel">
+    <header><h2>Message as received</h2>{% if d.sender and d.sender.value %}<span class="aside">sender {{ d.sender.value }} — {{ d.sender.type or 'unclassified' }}</span>{% endif %}</header>
+    <div class="body"><pre class="raw">{{ c.input_text }}</pre>
+    {% if d.email_headers %}<h3>E-mail headers</h3><table class="kv">{% for k, v in d.email_headers.items() if v %}<tr><th>{{ k }}</th><td class="mono">{{ v }}</td></tr>{% endfor %}</table>{% endif %}
+    </div>
+  </section>
+  {% for l in d.links or [] %}
+  <section class="panel">
+    <header><h2>Embedded link</h2><span class="aside">{{ risk(l.level) }} {{ l.score }}</span></header>
+    <div class="body">
+      <p class="mono">{{ l.url }}</p>
+      {% set lnet = l.net %}{% set linfo = l.info %}
+      {% include "_net.html" %}
+    </div>
+  </section>
+  {% endfor %}
+  {% endif %}
+
+  {% if info and c.kind in ('url', 'website') %}
+  <section class="panel">
+    <header><h2>Domain and infrastructure</h2></header>
+    <div class="body">{% set lnet = net %}{% set linfo = info %}{% include "_net.html" %}</div>
+  </section>
+  {% endif %}
+</div>
+
+<aside class="stack">
+  <section class="panel">
+    <header><h2>Case handling</h2></header>
+    <div class="body">
+      <form method="post" action="/cases/{{ c.id }}/status">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field"><label>Status</label>
+          <select name="status" id="status-select">
+            {% for k, l in STATUS_LABEL.items() %}<option value="{{ k }}" {{ 'selected' if c.status == k }}>{{ l }}</option>{% endfor %}
+          </select>
+          <div class="hint bad-txt" id="status-hint" hidden>Closing as fraud adds this case's domains, numbers, UPI IDs, wallets and app identifiers to the blocklist.</div>
+        </div>
+        <div class="field"><label>Note (appended, timestamped)</label><textarea name="notes" rows="4" class="short"></textarea></div>
+        <button class="btn" type="submit">Save</button>
+      </form>
+      {% if c.notes %}<h3>Notes</h3><pre class="raw">{{ c.notes }}</pre>{% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Evidence</h2><span class="aside">SHA-256 verified on download</span></header>
+    <div class="body tight">
+    {% if evidence %}
+      <table class="grid">
+        {% for e in evidence %}
+        <tr><td><a href="/evidence/{{ e.id }}">{{ e.label }}</a><br><span class="dim">{{ e.filename }} · {{ '{:,}'.format(e.size_bytes) }} bytes{% if not e.storage_path %} · local copy only{% endif %}</span>
+          <div class="mono mini">{{ e.sha256 }}</div></td></tr>
+        {% endfor %}
+      </table>
+    {% else %}<div class="empty">No file evidence.</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Handling record</h2></header>
+    <div class="body tight">
+      <table class="grid">
+        {% for t in trail %}<tr><td class="nowrap dim">{{ t.at|ist('%d %b %H:%M') }}</td><td>{{ t.username }}</td><td>{{ t.action|replace('_', ' ') }}{% if t.detail and t.action not in ('view_case',) %}<div class="dim">{{ t.detail }}</div>{% endif %}</td></tr>{% endfor %}
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Engine</h2></header>
+    <div class="body mini">
+      Analysed {{ r.engine.analysed_at|ist('%d %b %Y %H:%M:%S') if r.engine }}<br>
+      Live checks: {{ 'on' if r.engine and r.engine.live_checks else 'off' }} · Safe Browsing: {{ 'on' if r.engine and r.engine.gsb else 'not configured' }}<br>
+      Input SHA-256: <span class="mono">{{ c.content_sha256 }}</span>
+    </div>
+  </section>
+</aside>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_m.html" import risk, indicators %}
+{% block title %}Submission {{ case.case_no }}{% endblock %}
+{% block content %}
+<div class="warnbox {{ level }}">
+  <div class="mini">Reference no. <b>{{ case.case_no }}</b> · recorded {{ case.created_at|ist }}</div>
+  <h1>Assessment: {{ level }} RISK (score {{ score }}/100)</h1>
+  {% if level == 'HIGH' %}
+  <p><b>Do not click any link, install any app, or transfer money</b> in response to this item. It shows strong indicators of fraud.</p>
+  <ul class="steps">
+    <li>Never share OTP, UPI PIN, ATM PIN, CVV, or install screen-sharing apps (AnyDesk, TeamViewer, RustDesk).</li>
+    <li>If money has already been debited, call <b>1930</b> immediately or file a complaint at <b>cybercrime.gov.in</b>.</li>
+  </ul>
+  {% elif level == 'MEDIUM' %}
+  <p>Several warning signs were detected. Verify independently through the organisation's official website or branch before taking action.</p>
+  {% else %}
+  <p>Few automated indicators triggered, but stay cautious — never share an OTP, PIN or password with anyone claiming to be from a bank, courier, police or utility company.</p>
+  {% endif %}
+</div>
+
+<section class="panel">
+  <header><h2>Reasons for this result</h2><span class="aside">Reference {{ case.case_no }}</span></header>
+  <div class="body tight">{{ indicators(findings) }}</div>
+</section>
+
+<p class="after"><a class="btn plain" href="/report">Submit another item</a> <a class="btn plain" href="/check">Check a link</a></p>
+{% endblock %}

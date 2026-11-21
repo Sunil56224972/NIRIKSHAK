@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Report a suspicious message, link, app or website{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Report a suspicious message, link, app or website</h1>
+  <div class="sub">Your submission is analysed immediately and forwarded to the {{ UNIT_NAME }} register.</div></div>
+</div>
+{% if error %}<div class="note err">{{ error }}</div>{% endif %}
+
+<section class="panel">
+  <header><h2>Submission details</h2></header>
+  <div class="body">
+    <form method="post" action="/report" enctype="multipart/form-data" data-busy="Analysing your submission…">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="row">
+        <div class="field"><label>What are you reporting?</label>
+          <select name="kind" id="kind-select">
+            <option value="message" {{ 'selected' if form.kind == 'message' or not form.kind }}>Suspicious SMS / WhatsApp / e-mail message</option>
+            <option value="url" {{ 'selected' if form.kind == 'url' }}>Suspicious link (URL) or Play Store link</option>
+            <option value="website" {{ 'selected' if form.kind == 'website' }}>Fraudulent investment / loan / betting website</option>
+            <option value="apk" {{ 'selected' if form.kind == 'apk' }}>Suspicious Android app (.apk file)</option>
+          </select>
+        </div>
+        <div class="field" data-kind="message"><label>Received on</label>
+          <select name="channel">
+            {% for v, l in [('sms','SMS'),('whatsapp','WhatsApp'),('email','E-mail'),('telegram','Telegram'),('social','Social media')] %}
+            <option value="{{ v }}" {{ 'selected' if form.channel == v }}>{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field" data-kind="message">
+        <label>Sender phone number / SMS header / e-mail address (optional)</label>
+        <input type="text" name="sender" value="{{ form.sender }}" placeholder="e.g. +91 98xxxxxxxx or VM-SBIINB">
+      </div>
+
+      <div class="field" data-kind="message">
+        <label>Message text</label>
+        <textarea name="text" rows="7" placeholder="Paste the full message you received…">{{ form.text }}</textarea>
+      </div>
+
+      <div class="field" data-kind="url website apk" hidden>
+        <label>Link / website / app-store address</label>
+        <input type="text" name="url" value="{{ form.url }}" placeholder="https://…">
+      </div>
+
+      <div class="field" data-kind="website apk" hidden>
+        <label>Upload file (.apk, saved .html webpage, or website screenshot)</label>
+        <input type="file" name="file" accept=".apk,.html,.htm,.mhtml,.txt,.png,.jpg,.jpeg,.webp,.bmp">
+      </div>
+
+      <hr>
+      <div class="row">
+        <div class="field"><label>Your name (optional)</label><input type="text" name="name" value="{{ form.name }}"></div>
+        <div class="field"><label>Your phone or e-mail (optional, for follow-up)</label><input type="text" name="contact" value="{{ form.contact }}"></div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" name="consent" value="1" required>
+          I confirm this submission is for fraud examination. Do not include your own OTP, PIN or banking password.</label>
+      </div>
+      <div class="actions"><button class="btn" type="submit">Check risk &amp; submit report</button></div>
+    </form>
+  </div>
+</section>
+{% endblock %}

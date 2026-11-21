@@ -1,0 +1,38 @@
+{# expects lnet (network dict) and linfo (lexical info dict) #}
+<div class="cols-2">
+  <table class="kv">
+    <tr><th>Host</th><td class="mono">{{ linfo.unicode_host or linfo.host }}{% if linfo.unicode_host and linfo.unicode_host != linfo.host %} <span class="dim">({{ linfo.host }})</span>{% endif %}</td></tr>
+    <tr><th>Registrable domain</th><td class="mono">{{ linfo.registrable }}</td></tr>
+    {% if linfo.official_brand %}<tr><th>Official owner</th><td class="ok-txt">{{ linfo.official_brand }}</td></tr>{% endif %}
+    {% if lnet.whois %}{% set w = lnet.whois %}
+      {% if w.found %}
+      <tr><th>Registered</th><td>{{ (w.created or '')[:10] }}{% if w.age_days is not none %} — <b class="{{ 'bad-txt' if w.age_days < 90 }}">{{ w.age_days }} days ago</b>{% endif %}</td></tr>
+      <tr><th>Expires</th><td>{{ (w.expires or '')[:10] }}</td></tr>
+      <tr><th>Registrar</th><td>{{ w.registrar }}</td></tr>
+      <tr><th>Registrar abuse</th><td class="mono">{{ w.registrar_abuse_email }} {{ w.registrar_abuse_phone }}</td></tr>
+      <tr><th>Nameservers</th><td class="mono mini">{{ w.nameservers|join(', ') }}</td></tr>
+      <tr><th>Registry status</th><td class="mini">{{ w.status|join(', ') }}</td></tr>
+      {% else %}<tr><th>Registration</th><td>No registry record</td></tr>{% endif %}
+    {% endif %}
+  </table>
+  <table class="kv">
+    <tr><th>Resolves to</th><td class="mono">{{ (lnet.dns or [])|join(', ') or '—' }}</td></tr>
+    {% if lnet.hosting %}<tr><th>Hosting network</th><td>{{ lnet.hosting.network }} {{ lnet.hosting.org }} <span class="dim">{{ lnet.hosting.country }}</span></td></tr>{% endif %}
+    {% if lnet.tls %}{% set t = lnet.tls %}
+    <tr><th>TLS</th><td>{% if t.verified %}<span class="ok-txt">valid</span>{% else %}<span class="bad-txt">invalid — {{ t.verify_error }}</span>{% endif %} · {{ t.protocol }}</td></tr>
+    <tr><th>Certificate issuer</th><td>{{ t.issuer }}</td></tr>
+    <tr><th>Issued</th><td>{{ t.not_before[:10] }} ({{ t.issued_days_ago }} days ago)</td></tr>
+    {% endif %}
+    {% if lnet.http %}<tr><th>Web server</th><td>{{ lnet.http.server or '—' }} {{ lnet.http.powered_by }}</td></tr>{% endif %}
+  </table>
+</div>
+{% if lnet.http and lnet.http.chain %}
+<h3>Redirect chain</h3>
+<ol class="chain">{% for h in lnet.http.chain %}<li>{{ h.status }} &nbsp; {{ h.url }}{% if not h.tls_verified %} <span class="bad-txt">[TLS unverified]</span>{% endif %}</li>{% endfor %}
+{% if lnet.http.soft_redirect %}<li>script/meta &nbsp; {{ lnet.http.soft_redirect }}</li>{% endif %}</ol>
+{% endif %}
+{% if lnet.errors %}
+<details class="more"><summary>Checks that could not complete ({{ lnet.errors|length }})</summary>
+<table class="kv">{% for k, v in lnet.errors.items() %}<tr><th>{{ k }}</th><td class="mono mini">{{ v }}</td></tr>{% endfor %}</table></details>
+{% endif %}
+{% if not lnet %}<p class="dim mini">Live checks were not run for this item.</p>{% endif %}

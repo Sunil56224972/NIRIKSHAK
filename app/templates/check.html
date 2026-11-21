@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "_m.html" import risk, indicators %}
+{% block title %}Check a link before opening{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Check a link before opening</h1><div class="sub">Inspects the domain, redirects, registration age and fraud records without executing the page in your browser.</div></div>
+</div>
+
+<section class="panel gap">
+  <div class="body">
+    <form method="get" action="/check" data-busy="Checking link…">
+      <div class="row">
+        <div class="field"><input type="text" name="u" value="{{ u or '' }}" required placeholder="Paste a link, e.g. https://sbi-kyc-update.top/login"></div>
+        <div><button class="btn" type="submit">Check link</button></div>
+      </div>
+    </form>
+  </div>
+</section>
+
+{% if error %}<div class="note err">{{ error }}</div>{% endif %}
+
+{% if info %}
+<div class="warnbox {{ level }}">
+  <h1>{% if level == 'HIGH' %}Warning — high risk link ({{ score }}/100){% elif level == 'MEDIUM' %}Caution — suspicious link ({{ score }}/100){% else %}Low automated risk ({{ score }}/100){% endif %}</h1>
+  <p class="mono">{{ info.url }}</p>
+  {% if level == 'HIGH' %}
+  <p><b>We strongly advise against opening this address.</b> It matches indicators associated with phishing, fake apps or financial scams.</p>
+  {% elif level == 'MEDIUM' %}
+  <p>This link has unusual characteristics. Do not enter banking credentials, OTPs or personal documents on it.</p>
+  {% else %}
+  <p>No major automated risk indicators triggered. Still verify the domain carefully before signing in or paying.</p>
+  {% endif %}
+  {% if info.intel.linked %}
+  <p class="bad-txt"><b>Reported {{ info.intel.linked|map(attribute='case_no')|unique|list|length }} time(s)</b> in the {{ UNIT_NAME }} register.</p>
+  {% endif %}
+  <div class="actions">
+    <a class="btn plain" href="/report?kind=url&url={{ info.url|urlq }}">Report this link to Cyber Crime Cell</a>
+    {% if level == 'LOW' and info.url.startswith(('http://', 'https://')) %}
+    <a class="btn" href="{{ info.url }}" target="_blank" rel="noopener noreferrer nofollow">Open link</a>
+    {% endif %}
+  </div>
+  {% if level in ('MEDIUM', 'HIGH') and info.url.startswith(('http://', 'https://')) %}
+  <details class="more"><summary>Proceed anyway (not recommended)</summary>
+    <p class="mini">Opening this link exposes your browser to potential fraud. <a href="{{ info.url }}" target="_blank" rel="noopener noreferrer nofollow">Continue to {{ info.url }}</a></p>
+  </details>
+  {% endif %}
+</div>
+
+<section class="panel">
+  <header><h2>Indicators</h2></header>
+  <div class="body tight">{{ indicators(findings) }}</div>
+</section>
+{% endif %}
+{% endblock %}

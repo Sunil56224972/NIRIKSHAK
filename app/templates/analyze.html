@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}New analysis{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>New analysis</h1><div class="sub">Every analysis opens a case and is saved to the register.</div></div></div>
+{% if error %}<div class="note err">{{ error }}</div>{% endif %}
+
+<div class="cols">
+<div>
+<div class="tabs">
+  <a href="/analyze?type=message" class="{{ 'on' if kind == 'message' }}">Message</a>
+  <a href="/analyze?type=url" class="{{ 'on' if kind == 'url' }}">URL / app-store link</a>
+  <a href="/analyze?type=website" class="{{ 'on' if kind == 'website' }}">Website</a>
+  <a href="/analyze?type=apk" class="{{ 'on' if kind == 'apk' }}">Android APK</a>
+</div>
+<section class="panel">
+  <div class="body">
+  <form method="post" action="/analyze/{{ kind }}" enctype="multipart/form-data" data-busy="Analysing…">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if kind == 'message' %}
+      <div class="row">
+        <div class="field"><label>Channel</label>
+          <select name="channel">
+            {% for v, l in [('sms','SMS'),('whatsapp','WhatsApp'),('email','E-mail'),('telegram','Telegram'),('social','Social media'),('other','Other')] %}
+            <option value="{{ v }}" {{ 'selected' if form.channel == v }}>{{ l }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label>Sender (number / header / address)</label>
+          <input type="text" name="sender" value="{{ form.sender }}" placeholder="e.g. +91 98xxxxxxxx or VM-SBIINB-S"></div>
+      </div>
+      <div class="field"><label>Message text</label>
+        <textarea name="text" rows="12" required placeholder="Paste the message exactly as received.">{{ form.text }}</textarea>
+        <div class="hint">For e-mail, paste the full source (headers + body) to enable SPF/DKIM and Reply-To checks.</div></div>
+    {% elif kind == 'url' %}
+      <div class="field"><label>URL</label>
+        <input type="text" name="url" value="{{ form.url }}" required placeholder="https://… or play.google.com/store/apps/details?id=…">
+        <div class="hint">Defanged forms (hxxp, [.]) are accepted.</div></div>
+    {% elif kind == 'website' %}
+      <div class="field"><label>Website address</label>
+        <input type="text" name="url" value="{{ form.url }}" placeholder="https://…"></div>
+      <div class="field"><label>— or saved page / screenshot</label><input type="file" name="file" accept=".html,.htm,.mhtml,.mht,.txt,.png,.jpg,.jpeg,.webp,.bmp">
+        <div class="hint">Use a saved page (.html / .mhtml) or webpage screenshot (.png / .jpg); screenshots are OCR-analysed automatically.</div></div>
+    {% else %}
+      <div class="field"><label>APK file</label><input type="file" name="file" accept=".apk">
+        <div class="hint">Static analysis only — the app is never executed.</div></div>
+      <div class="field"><label>— or Play Store / App Store link</label>
+        <input type="text" name="url" value="{{ form.url }}" placeholder="https://play.google.com/store/apps/details?id=…"></div>
+    {% endif %}
+    <div class="field"><label class="check"><input type="checkbox" name="live" value="1" checked>
+      Run live checks (DNS, registration date, redirects, TLS, page / store fetch)</label>
+      <div class="hint">Untick on an isolated terminal. Fetches go out from this server, never from your browser.</div></div>
+    <div class="actions"><button class="btn" type="submit">Analyse and open case</button></div>
+  </form>
+  </div>
+</section>
+</div>
+
+<aside class="panel">
+  <header><h2>What is checked</h2></header>
+  <div class="body mini">
+  {% if kind == 'message' %}
+    <p>Scam phrasing (KYC block, electricity cut-off, parcel, digital arrest, jobs, investment, loan, prize, refund, sextortion, betting), urgency, requests for OTP/PIN/remote-access, sender type, brand claims.</p>
+    <p>Every link inside the message is analysed as a URL. UPI IDs, phone numbers, bank accounts, wallets, Telegram/WhatsApp handles are extracted and cross-matched with earlier cases.</p>
+  {% elif kind == 'url' %}
+    <p>Look-alike and typosquatted domains, punycode, shorteners, free hosting, risky TLDs, lure words, direct APK links.</p>
+    <p>Live: domain registration date and registrar (RDAP), DNS and hosting network, full redirect chain, TLS certificate, Google Safe Browsing (if a key is configured), local blocklist.</p>
+  {% elif kind == 'website' %}
+    <p>Guaranteed-return and MLM referral language, betting/colour-prediction, task/recharge schemes, fake loan offers, fake RBI/SEBI claims, forms harvesting OTP/card/Aadhaar, offsite form posting, obfuscated scripts, Telegram-bot exfiltration, APK links.</p>
+    <p>Extracts UPI IDs (including upi:// pay links), bank accounts with IFSC, phone numbers, crypto wallets and chat links. A snapshot of the page is preserved with its SHA-256.</p>
+  {% else %}
+    <p>Manifest: package, version, SDK levels, permissions, components, SMS/boot receivers, launcher visibility. Signing certificates (v1/v2/v3) with fingerprints.</p>
+    <p>Code strings: embedded URLs/IPs/UPI IDs, SMS and accessibility API use, Telegram-bot exfiltration, dynamic code loading, packers. Brand impersonation and icon re-use against earlier apps.</p>
+  {% endif %}
+  </div>
+</aside>
+</div>
+{% endblock %}

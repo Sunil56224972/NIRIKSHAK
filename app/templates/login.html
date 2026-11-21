@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="gate">
+  <div class="seal"><b>{{ APP_NAME }}</b><span>{{ UNIT_NAME }} — authorised personnel only</span></div>
+  {% if created %}<div class="note ok">Administrator account created. Sign in to continue.</div>{% endif %}
+  {% if error %}<div class="note err">{{ error }}</div>{% endif %}
+  <div class="panel">
+    <header><h2>Officer sign-in</h2></header>
+    <div class="body">
+      <form method="post" action="/login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field"><label for="u">Username</label><input id="u" type="text" name="username" autocomplete="username" required autofocus></div>
+        <div class="field"><label for="p">Password</label><input id="p" type="password" name="password" autocomplete="current-password" required></div>
+        <div class="actions"><button class="btn" type="submit">Sign in</button></div>
+      </form>
+    </div>
+  </div>
+  <p class="mini">Members of the public: <a href="/report">report a fraud</a> or <a href="/check">check a link</a>.</p>
+</div>
+{% endblock %}

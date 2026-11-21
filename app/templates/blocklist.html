@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Blocklist{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Blocklist &amp; intelligence feeds</h1><div class="sub">{{ total }} indicator{{ '' if total == 1 else 's' }} on blocklist · matches force HIGH risk (score floor 75)</div></div>
+</div>
+
+{% if msg %}<div class="note info">{{ msg }}</div>{% endif %}
+
+<div class="cols">
+  <section class="panel">
+    <form class="filters" method="get" action="/blocklist">
+      <div class="field"><label>Search</label><input type="search" name="q" value="{{ q }}" placeholder="Domain, URL, phone, UPI ID, package…"></div>
+      <div class="field"><label>Type</label>
+        <select name="type"><option value="">All</option>
+          {% for k, l in ETYPE_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if type == k }}>{{ l }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><button class="btn" type="submit">Filter</button> <a class="btn plain" href="/blocklist">Reset</a></div>
+    </form>
+    <div class="body tight">
+    {% if rows %}
+      <table class="grid">
+        <tr><th>Type</th><th>Value</th><th>Source</th><th>Note</th><th>Added</th><th></th></tr>
+        {% for b in rows %}
+        <tr>
+          <td class="nowrap">{{ b.etype|etype }}</td>
+          <td class="mono">{{ b.value }}</td>
+          <td>{{ b.source }}</td>
+          <td class="dim">{{ b.note }}</td>
+          <td class="nowrap dim">{{ b.added_at|ist }}</td>
+          <td class="nowrap">
+            {% if user.role == 'admin' %}
+            <form class="inline" method="post" action="/blocklist/{{ b.id }}/delete">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="btn danger small" type="submit" data-confirm="Remove {{ b.value }} from blocklist?">remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<div class="empty">No entries on the blocklist matching this query.</div>{% endif %}
+    </div>
+  </section>
+
+  <aside class="stack">
+    <section class="panel">
+      <header><h2>Add indicator manually</h2></header>
+      <div class="body">
+        <form method="post" action="/blocklist/add">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="field"><label>Type</label>
+            <select name="etype">
+              {% for k, l in ETYPE_LABELS.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}
+            </select></div>
+          <div class="field"><label>Value</label><input type="text" name="value" required placeholder="e.g. sbi-kyc-update.top or +919812345678"></div>
+          <div class="field"><label>Reference / FIR / NCRP ack no.</label><input type="text" name="note" placeholder="e.g. NCRP #31904221 / FIR 42/2026"></div>
+          <button class="btn" type="submit">Add to blocklist</button>
+        </form>
+      </div>
+    </section>
+
+    {% if user.role == 'admin' %}
+    <section class="panel">
+      <header><h2>External threat feeds</h2></header>
+      <div class="body">
+        <p class="mini">Pull active phishing and malware URLs/domains from public feeds into the blocklist.</p>
+        {% for key, info in feeds.items() %}
+        <div class="feedrow">
+          <span><b>{{ info[0] }}</b></span>
+          <form class="inline" method="post" action="/blocklist/sync/{{ key }}" data-busy="Syncing…">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn plain small" type="submit">Sync now</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

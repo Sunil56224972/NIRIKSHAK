@@ -1,0 +1,32 @@
+{% macro risk(level) -%}<span class="risk {{ level }}">{{ level }}</span>{%- endmacro %}
+
+{% macro status(s) -%}<span class="st {{ s }}">{{ s|status }}</span>{%- endmacro %}
+
+{% macro pager(page_no, pages, qs, base) -%}
+{% if pages > 1 %}
+<div class="pager">
+  {% if page_no > 1 %}<a href="{{ base }}?{{ qs }}{{ '&' if qs }}page_no={{ page_no - 1 }}">&lsaquo; Prev</a>{% endif %}
+  {% for p in range([1, page_no - 3]|max, [pages, page_no + 3]|min + 1) %}
+    {% if p == page_no %}<span class="cur">{{ p }}</span>{% else %}<a href="{{ base }}?{{ qs }}{{ '&' if qs }}page_no={{ p }}">{{ p }}</a>{% endif %}
+  {% endfor %}
+  {% if page_no < pages %}<a href="{{ base }}?{{ qs }}{{ '&' if qs }}page_no={{ page_no + 1 }}">Next &rsaquo;</a>{% endif %}
+  <span class="mini">page {{ page_no }} of {{ pages }}</span>
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro indicators(items) -%}
+<table class="ind">
+{% for i in items %}
+  <tr class="{{ 'pos' if i.weight > 0 else ('neg' if i.weight < 0 else 'zero') }}">
+    <td class="w">{{ '%+d'|format(i.weight) }}</td>
+    <td>
+      <div class="t">{{ i.title }}</div>
+      <div class="d">{{ i.detail }}</div>
+      {% if i.evidence %}<div class="e">{{ i.evidence }}</div>{% endif %}
+    </td>
+    <td class="g">{{ i.group }}</td>
+  </tr>
+{% endfor %}
+</table>
+{%- endmacro %}

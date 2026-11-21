@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ UNIT_NAME }}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{% if public %}public{% endif %}">
+<div class="mast">
+  <div class="mast-in">
+    <a class="brand" href="{{ '/report' if public else '/' }}"><b>{{ APP_NAME }}</b><span>Cyber Fraud Analysis System</span></a>
+    {% if user and not public %}
+    <nav>
+      <a href="/" class="{{ 'on' if nav == 'dash' }}">Dashboard</a>
+      <a href="/analyze" class="{{ 'on' if nav == 'new' }}">New analysis</a>
+      <a href="/cases" class="{{ 'on' if nav == 'cases' }}">Case register</a>
+      <a href="/identifiers" class="{{ 'on' if nav == 'ids' }}">Identifiers</a>
+      <a href="/heatlist" class="{{ 'on' if nav == 'heat' }}">Heat-list</a>
+      <a href="/blocklist" class="{{ 'on' if nav == 'block' }}">Blocklist</a>
+      {% if user.role == 'admin' %}
+      <a href="/users" class="{{ 'on' if nav == 'users' }}">Users</a>
+      <a href="/audit" class="{{ 'on' if nav == 'audit' }}">Audit log</a>
+      {% endif %}
+    </nav>
+    <div class="who">
+      <a href="/account">{{ user.rank }} {{ user.full_name }}</a>
+      <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Sign out</button></form>
+    </div>
+    {% elif public %}
+    <nav>
+      <a href="/report">Report a fraud</a>
+      <a href="/check">Check a link</a>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+<div class="strip"><div class="strip-in">
+  <span>{{ UNIT_NAME }}</span>
+  <span>{% if public %}National cyber crime helpline: <b>1930</b> · cybercrime.gov.in{% else %}Restricted system — activity is logged{% endif %}</span>
+</div></div>
+<main>
+{% block content %}{% endblock %}
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

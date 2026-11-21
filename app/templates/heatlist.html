@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Heat-list{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>Heat-list — frequently reported identifiers</h1><div class="sub">Ranked by distinct cases within the selected time window (excluding benign closures)</div></div>
+  <div class="actions">
+    <a class="btn plain" href="/heatlist/export.csv?days={{ days }}{{ '&type=' ~ type if type }}">Export CSV</a>
+  </div>
+</div>
+
+<section class="panel gap">
+  <form class="filters" method="get" action="/heatlist">
+    <div class="field"><label>Time window</label>
+      <select name="days">
+        {% for d, l in [(1,'Last 24 hours'),(7,'Last 7 days'),(30,'Last 30 days'),(90,'Last 90 days'),(365,'Last 12 months')] %}
+        <option value="{{ d }}" {{ 'selected' if days == d }}>{{ l }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Identifier type</label>
+      <select name="type"><option value="">All major types</option>
+        {% for k, l in ETYPE_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if type == k }}>{{ l }}</option>{% endfor %}
+      </select></div>
+    <div class="field"><button class="btn" type="submit">Apply</button> <a class="btn plain" href="/heatlist">Reset</a></div>
+  </form>
+</section>
+
+<div class="cols-2">
+{% for etype, rows in sections %}
+  <section class="panel">
+    <header><h2>{{ etype|etype }}</h2><a class="aside" href="/identifiers?type={{ etype }}">View all</a></header>
+    <div class="body tight">
+    {% if rows %}
+      {% set max_r = rows[0].reports if rows[0].reports > 0 else 1 %}
+      <table class="grid">
+        <tr><th>#</th><th>Identifier</th><th class="num">Cases</th><th class="num">High risk</th><th>Last seen</th></tr>
+        {% for h in rows %}
+        <tr>
+          <td class="dim num">{{ loop.index }}</td>
+          <td>
+            <progress class="heat" max="{{ max_r }}" value="{{ h.reports }}"></progress>
+            <a class="mono" href="/identifiers/{{ h.entity_id }}">{{ h.display }}</a>
+          </td>
+          <td class="num"><b>{{ h.reports }}</b></td>
+          <td class="num">{% if h.high_risk %}<span class="bad-txt">{{ h.high_risk }}</span>{% else %}0{% endif %}</td>
+          <td class="nowrap dim">{{ h.last_seen|ist('%d %b %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<div class="empty">No {{ etype|etype|lower }} identifiers reported in this window.</div>{% endif %}
+    </div>
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

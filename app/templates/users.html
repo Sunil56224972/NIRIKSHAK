@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Officer accounts{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Officer accounts</h1><div class="sub">Manage workstation access and privileges</div></div></div>
+{% if msg %}<div class="note info">{{ msg }}</div>{% endif %}
+
+<div class="cols">
+  <section class="panel">
+    <header><h2>Registered officers</h2></header>
+    <div class="body tight">
+      <table class="grid">
+        <tr><th>Username</th><th>Officer</th><th>Badge / PIS</th><th>Unit</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
+        {% for u in rows %}
+        <tr>
+          <td class="mono">{{ u.username }}</td>
+          <td>{{ u.rank }} {{ u.full_name }}</td>
+          <td class="mono">{{ u.badge_no or '—' }}</td>
+          <td>{{ u.unit or '—' }}</td>
+          <td><span class="tag">{{ u.role }}</span></td>
+          <td>{% if u.active %}<span class="ok-txt">active</span>{% else %}<span class="bad-txt">disabled</span>{% endif %}</td>
+          <td class="nowrap dim">{{ u.last_login|ist if u.last_login else 'never' }}</td>
+          <td class="nowrap">
+            {% if u.id != user.id %}
+            <form class="inline" method="post" action="/users/{{ u.id }}/toggle">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button class="btn plain small" type="submit">{{ 'disable' if u.active else 'enable' }}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <header><h2>Create officer account</h2></header>
+    <div class="body">
+      <form method="post" action="/users">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field"><label>Username</label><input type="text" name="username" required placeholder="e.g. si.sharma"></div>
+        <div class="field"><label>Full name</label><input type="text" name="full_name" required></div>
+        <div class="row">
+          <div class="field"><label>Rank</label><input type="text" name="rank" placeholder="SI / Insp. / DSP"></div>
+          <div class="field"><label>Badge / PIS no.</label><input type="text" name="badge_no"></div>
+        </div>
+        <div class="field"><label>Unit / station</label><input type="text" name="unit" value="{{ UNIT_NAME }}"></div>
+        <div class="field"><label>Role</label>
+          <select name="role"><option value="officer">Investigating Officer</option><option value="admin">Administrator</option></select></div>
+        <div class="field"><label>Temporary password</label><input type="password" name="password" required autocomplete="new-password">
+          <div class="hint">10+ characters, at least 3 character classes.</div></div>
+        <button class="btn" type="submit">Create account</button>
+      </form>
+    </div>
+  </aside>
+</div>
+{% endblock %}

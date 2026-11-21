@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Officer account</h1><div class="sub">{{ user.rank }} {{ user.full_name }} ({{ user.username }})</div></div></div>
+{% if msg %}<div class="note info">{{ msg }}</div>{% endif %}
+
+<div class="cols-2">
+  <section class="panel">
+    <header><h2>Details</h2></header>
+    <div class="body">
+      <table class="kv">
+        <tr><th>Username</th><td class="mono">{{ user.username }}</td></tr>
+        <tr><th>Name</th><td>{{ user.full_name }}</td></tr>
+        <tr><th>Rank</th><td>{{ user.rank or '—' }}</td></tr>
+        <tr><th>Badge / PIS no.</th><td class="mono">{{ user.badge_no or '—' }}</td></tr>
+        <tr><th>Unit</th><td>{{ user.unit or UNIT_NAME }}</td></tr>
+        <tr><th>Role</th><td>{{ user.role }}</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Change password</h2></header>
+    <div class="body">
+      <form method="post" action="/account">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field"><label>Current password</label><input type="password" name="current" required autocomplete="current-password"></div>
+        <div class="field"><label>New password</label><input type="password" name="password" required autocomplete="new-password">
+          <div class="hint">At least 10 characters, three of: lowercase, uppercase, digits, symbols.</div></div>
+        <div class="field"><label>Repeat new password</label><input type="password" name="password2" required autocomplete="new-password"></div>
+        <button class="btn" type="submit">Update password</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_m.html" import risk, status %}
+{% block title %}{{ e.display }}{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div>
+    <div class="sub"><a href="/identifiers">Identifiers</a> / {{ e.etype|etype }}</div>
+    <h1 class="mono">{{ e.display }}</h1>
+  </div>
+  <div class="actions">
+    <button type="button" class="btn plain" data-copy="{{ e.display }}">Copy value</button>
+    {% if not blocklisted %}
+    <form class="inline" method="post" action="/blocklist/add">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="etype" value="{{ e.etype }}">
+      <input type="hidden" name="value" value="{{ e.value }}">
+      <input type="hidden" name="note" value="Promoted from identifier dossier ({{ e.case_count }} cases)">
+      <button class="btn danger" type="submit">Add to blocklist</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if blocklisted %}
+<div class="note err"><b>On blocklist:</b> Listed by {{ blocklisted[0].source }}{% if blocklisted[0].note %} — {{ blocklisted[0].note }}{% endif %} ({{ blocklisted[0].added_at|ist }}).</div>
+{% endif %}
+
+<div class="cols">
+  <div class="stack">
+    {% if cases or co %}
+    <section class="panel">
+      <header><h2>Link diagram</h2><span class="aside">click any node to inspect</span></header>
+      <div class="body">{{ chart_svg|safe }}</div>
+    </section>
+    {% endif %}
+    <section class="panel">
+      <header><h2>Cases containing this identifier</h2><span class="aside">{{ cases|length }} case{{ '' if cases|length == 1 else 's' }}</span></header>
+      <div class="body tight">
+      {% if cases %}
+        <table class="grid">
+          <tr><th>Case no.</th><th>Channel / Type</th><th>Subject</th><th>Where found</th><th>Risk</th><th class="num">Score</th><th>Status</th><th>Received</th></tr>
+          {% for c in cases %}
+          <tr>
+            <td class="nowrap"><a href="/cases/{{ c.id }}">{{ c.case_no }}</a></td>
+            <td class="nowrap">{{ c.kind|kind }}{% if c.source == 'citizen' %} <span class="tag citizen">citizen</span>{% endif %}</td>
+            <td><span class="trunc">{{ c.title }}</span></td>
+            <td class="dim">{{ c.context }}</td>
+            <td>{{ risk(c.risk_level) }}</td>
+            <td class="num">{{ c.risk_score }}</td>
+            <td>{{ status(c.status) }}</td>
+            <td class="nowrap dim">{{ c.created_at|ist }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}<div class="empty">No linked cases.</div>{% endif %}
+      </div>
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="panel">
+      <header><h2>Dossier summary</h2></header>
+      <div class="body">
+        <table class="kv">
+          <tr><th>Type</th><td>{{ e.etype|etype }}</td></tr>
+          <tr><th>Normalised key</th><td class="mono">{{ e.value }}</td></tr>
+          <tr><th>Case count</th><td><b>{{ e.case_count }}</b></td></tr>
+          <tr><th>First observed</th><td>{{ e.first_seen|ist }}</td></tr>
+          <tr><th>Last observed</th><td>{{ e.last_seen|ist }}</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Co-occurring identifiers</h2><span class="aside">seen in the same cases</span></header>
+      <div class="body tight">
+      {% if co %}
+        <table class="grid">
+          <tr><th>Identifier</th><th class="num">Together</th><th class="num">Total</th></tr>
+          {% for a in co %}
+          <tr>
+            <td><span class="dim">{{ a.etype|etype }}</span><br><a class="mono" href="/identifiers/{{ a.id }}">{{ a.display }}</a></td>
+            <td class="num">{{ a.together }}</td>
+            <td class="num">{{ a.case_count }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}<div class="empty">No co-occurring identifiers.</div>{% endif %}
+      </div>
+    </section>
+  </aside>
+</div>
+{% endblock %}

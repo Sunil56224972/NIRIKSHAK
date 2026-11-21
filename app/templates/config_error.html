@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Configuration required</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<div class="mast"><div class="mast-in"><span class="brand"><b>NIRIKSHAK</b><span>Cyber Fraud Analysis System</span></span></div></div>
+<main>
+  <div class="gate">
+    <div class="panel">
+      <header><h2>Configuration required</h2></header>
+      <div class="body">
+        <p>The server cannot start because the database connection is not configured:</p>
+        <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+        <p>Copy <code>.env.example</code> to <code>.env</code>, fill in the Supabase project URL and the
+          <b>service_role</b> key (Supabase dashboard → Project Settings → API Keys), then restart.</p>
+        <p class="mini">The service_role key stays on this server. It is never sent to browsers.</p>
+      </div>
+    </div>
+  </div>
+</main>
+</body></html>

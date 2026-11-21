@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="gate">
+  <div class="panel">
+    <header><h2>{{ heading }}</h2></header>
+    <div class="body"><p>{{ text }}</p><p><a href="/">Dashboard</a> · <a href="/cases">Case register</a></p></div>
+  </div>
+</div>
+{% endblock %}
