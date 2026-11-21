@@ -9,6 +9,7 @@ Implements, without third-party Android tooling:
 from __future__ import annotations
 
 import hashlib
+import html as html_mod
 import io
 import re
 import struct
@@ -758,11 +759,17 @@ def analyze_store_link(url: str, run_live: bool = True) -> dict:
             if platform == "Google Play" and r.status_code == 404:
                 f.add("store.removed", "Listing not found on Google Play",
                       "The app was removed (often after policy violations) or never existed; links to it in messages are a red flag.",
-                      20, "app", package)
+                      30, "app", package)
             elif r.ok:
                 t = re.search(r"<title[^>]*>([^<]+)</title>", r.text, re.I)
-                raw_t = t.group(1).strip() if t else ""
-                for suf in (" - Apps on Google Play", " on the App\u00a0Store", " on the App Store"):
+                raw_t = html_mod.unescape(t.group(1).strip()) if t else ""
+                for suf in (
+                    " - Apps on Google Play",
+                    " \u2013 Apps on Google Play",
+                    " \u2014 Apps on Google Play",
+                    " on the App\u00a0Store",
+                    " on the App Store",
+                ):
                     raw_t = raw_t.replace(suf, "")
                 meta["title"] = raw_t.strip()
                 if platform == "Google Play":

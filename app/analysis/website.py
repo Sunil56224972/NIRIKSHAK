@@ -104,6 +104,14 @@ _WIN_OCR_PS = (
 )
 
 
+def _clean_ocr_text(parsed: str) -> str:
+    cleaned = re.sub(r"^\s*\[Note:[^\]]*ocr\.space[^\]]*\]\s*", "", parsed, flags=re.I)
+    return "\n".join(
+        ln for ln in cleaned.splitlines()
+        if "ocr.space/ocrapi" not in ln.lower()
+    ).strip()
+
+
 def _cloud_ocr(data: bytes) -> str | None:
     if not (config.LIVE_CHECKS and (config.OCR_SPACE_API_KEY or config.CLOUD_OCR)):
         return None
@@ -125,6 +133,11 @@ def _cloud_ocr(data: bytes) -> str | None:
             data={"language": "eng", "OCREngine": "2", "scale": "true"},
             timeout=max(20.0, config.NET_TIMEOUT * 2.5),
         )
+        if r.status_code == 429:
+            raise ValueError(
+                "Cloud OCR demo rate limit reached. Wait 2–3 minutes and retry, configure a free personal "
+                "OCR_SPACE_API_KEY in environment variables, or upload the saved .html / .mhtml page."
+            )
         if not r.ok:
             return None
         res = r.json()
@@ -134,7 +147,9 @@ def _cloud_ocr(data: bytes) -> str | None:
             (item.get("ParsedText") or "")
             for item in (res.get("ParsedResults") or [])
         ).strip()
-        return parsed if parsed else None
+        return _clean_ocr_text(parsed)
+    except ValueError:
+        raise
     except Exception:
         return None
 
