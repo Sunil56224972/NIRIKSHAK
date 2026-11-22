@@ -122,4 +122,16 @@
       var t = el.textContent; el.textContent = "copied"; setTimeout(function () { el.textContent = t; }, 900);
     });
   });
+
+  // Fill demo reviewer credentials on the login page (CSP-safe, no inline handler).
+  document.querySelectorAll("[data-fill-login]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      var u = document.getElementById("u");
+      var p = document.getElementById("p");
+      if (u) u.value = el.getAttribute("data-fill-login") || "";
+      if (p) p.value = el.getAttribute("data-fill-pass") || "";
+      var btn = document.querySelector('form[action="/login"] button[type=submit]');
+      if (btn) btn.focus();
+    });
+  });
 })();
