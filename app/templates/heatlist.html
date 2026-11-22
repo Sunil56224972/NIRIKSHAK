@@ -37,7 +37,7 @@
         <tr>
           <td class="dim num">{{ loop.index }}</td>
           <td>
-            <progress class="heat" max="{{ max_r }}" value="{{ h.reports }}"></progress>
+            <progress class="heat{{ ' high' if h.high_risk }}" max="{{ max_r }}" value="{{ h.reports }}"></progress>
             <a class="mono" href="/identifiers/{{ h.entity_id }}">{{ h.display }}</a>
           </td>
           <td class="num"><b>{{ h.reports }}</b></td>
