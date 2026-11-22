@@ -1,0 +1,1786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIRIKSHAK — Cyber Fraud Analysis System</title>
+<style>
+/* NIRIKSHAK — console stylesheet.
+   Deliberately plain: dense tables, system fonts, print-friendly. */
+
+:root {
+  --ink: #1d232b;
+  --ink-2: #48525c;
+  --ink-3: #6b747d;
+  --paper: #f2f2ee;
+  --panel: #ffffff;
+  --rule: #c8cbc3;
+  --rule-2: #e2e3de;
+  --head: #1f2d3a;
+  --head-2: #2c3e4f;
+  --band: #a6802a;
+  --link: #1b4f7a;
+  --high: #a3201b;
+  --high-bg: #f8e9e7;
+  --med: #8a5a00;
+  --med-bg: #fbf1dc;
+  --low: #2f6b2f;
+  --low-bg: #e7f1e4;
+  --mono: Consolas, "Cascadia Mono", "Lucida Console", monospace;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 13.5px; }
+html, body { overflow-x: clip; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  line-height: 1.45;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.35rem; margin: 0 0 2px; font-weight: 600; }
+h2 { font-size: 1.02rem; margin: 0; font-weight: 600; }
+h3 { font-size: .93rem; margin: 14px 0 6px; font-weight: 600; }
+p { margin: 0 0 8px; }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+.mono { word-break: break-all; }
+hr { border: 0; border-top: 1px solid var(--rule-2); margin: 14px 0; }
+
+/* ---- masthead -------------------------------------------------------- */
+.mast {
+  background: var(--head);
+  color: #e7ebee;
+  border-bottom: 3px solid var(--band);
+}
+.mast-in {
+  max-width: 1320px; margin: 0 auto; padding: 0 18px;
+  display: flex; align-items: center; gap: 22px; height: 46px;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; color: #fff; white-space: nowrap; }
+.brand b { letter-spacing: .14em; font-size: 1.02rem; }
+.brand span { color: #a9b6c1; font-size: .82rem; }
+.mast nav { display: flex; gap: 2px; flex: 1; }
+.mast nav a {
+  color: #cdd6dd; padding: 13px 10px 11px; font-size: .9rem; border-bottom: 2px solid transparent;
+}
+.mast nav a:hover { color: #fff; text-decoration: none; background: var(--head-2); }
+.mast nav a.on { color: #fff; border-bottom-color: #e4c77c; }
+.who { display: flex; align-items: center; gap: 10px; font-size: .84rem; color: #b8c3cc; white-space: nowrap; }
+.who a { color: #dfe6eb; }
+.who form { margin: 0; }
+.who button { background: none; border: 1px solid #50606e; color: #dfe6eb; padding: 2px 8px; font-size: .8rem; cursor: pointer; }
+.who button:hover { border-color: #8a99a6; }
+
+.strip {
+  background: #e4e5df; border-bottom: 1px solid var(--rule); font-size: .8rem; color: var(--ink-2);
+}
+.strip-in { max-width: 1320px; margin: 0 auto; padding: 4px 18px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 12px; }
+
+/* ---- layout --------------------------------------------------------------- */
+main { max-width: 1320px; margin: 0 auto; padding: 16px 18px 40px; }
+.pagehead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 12px; }
+.pagehead .sub { color: var(--ink-3); font-size: .86rem; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.cols > *, .cols-2 > *, .stack, .panel { min-width: 0; }
+.stack > * + * { margin-top: 14px; }
+
+.panel { background: var(--panel); border: 1px solid var(--rule); }
+.panel > header {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+  padding: 7px 12px; border-bottom: 1px solid var(--rule); background: #f7f7f4;
+}
+.panel > header h2 { font-size: .9rem; text-transform: uppercase; letter-spacing: .04em; color: #303a44; }
+.panel > header .aside { font-size: .8rem; color: var(--ink-3); }
+.panel .body { padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.panel .body.tight { padding: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---- counters ----------------------------------------------------------- */
+.counters { display: grid; grid-template-columns: repeat(6, 1fr); border: 1px solid var(--rule); background: var(--panel); margin-bottom: 14px; }
+.counters a, .counters div.c { padding: 10px 14px; border-right: 1px solid var(--rule-2); color: var(--ink); }
+.counters > :last-child { border-right: 0; }
+.counters a:hover { background: #f6f6f2; text-decoration: none; }
+.counters .n { font-size: 1.55rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.counters .l { font-size: .78rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: .03em; }
+.counters .alert .n { color: var(--high); }
+
+/* ---- tables --------------------------------------------------------------- */
+table.grid { width: 100%; border-collapse: collapse; font-size: .92rem; }
+table.grid th {
+  text-align: left; font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .03em;
+  color: #46505a; background: #eef0eb; border-bottom: 1px solid var(--rule); padding: 6px 8px; white-space: nowrap;
+}
+table.grid td { padding: 6px 8px; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+table.grid tr:nth-child(even) td { background: #fafaf8; }
+table.grid tr:hover td { background: #f1f4f6; }
+table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid td.nowrap { white-space: nowrap; }
+table.grid .dim { color: var(--ink-3); font-size: .86em; }
+.trunc { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+table.kv { width: 100%; border-collapse: collapse; font-size: .92rem; }
+table.kv th { text-align: left; width: 34%; color: var(--ink-2); font-weight: 500; padding: 4px 8px 4px 0; vertical-align: top; }
+table.kv td { padding: 4px 0; vertical-align: top; word-break: break-word; }
+table.kv tr + tr th, table.kv tr + tr td { border-top: 1px dotted var(--rule-2); }
+
+/* ---- risk / status labels ---------------------------------------------- */
+.risk {
+  display: inline-block; font-size: .74rem; font-weight: 700; letter-spacing: .05em; padding: 1px 6px;
+  border: 1px solid; line-height: 1.5; white-space: nowrap;
+}
+.risk.HIGH { color: var(--high); background: var(--high-bg); border-color: #dfb3ae; }
+.risk.MEDIUM { color: var(--med); background: var(--med-bg); border-color: #e3cc98; }
+.risk.LOW { color: var(--low); background: var(--low-bg); border-color: #b9d3b2; }
+.tag { display: inline-block; font-size: .76rem; padding: 0 6px; border: 1px solid var(--rule); color: var(--ink-2); background: #f6f6f3; white-space: nowrap; }
+.tag.citizen { border-color: #b6c6d6; color: #2c4e6e; background: #eef3f8; }
+.st { font-size: .84rem; white-space: nowrap; }
+.st.closed_fraud { color: var(--high); font-weight: 600; }
+.st.closed_benign { color: var(--ink-3); }
+.st.investigating { color: #24527a; font-weight: 600; }
+
+/* ---- verdict block -------------------------------------------------------- */
+.verdict { display: grid; grid-template-columns: 150px 1fr; border: 1px solid var(--rule); background: var(--panel); margin-bottom: 14px; }
+.verdict .score { padding: 14px; border-right: 1px solid var(--rule); text-align: center; }
+.verdict .score .big { font-size: 2.3rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.verdict .score .of { color: var(--ink-3); font-size: .8rem; }
+.verdict.HIGH .score { background: var(--high-bg); color: var(--high); }
+.verdict.MEDIUM .score { background: var(--med-bg); color: var(--med); }
+.verdict.LOW .score { background: var(--low-bg); color: var(--low); }
+.verdict .meta { padding: 12px 14px; }
+.verdict .meta h1 { word-break: break-word; }
+.meterbar { height: 6px; background: #e4e5e0; margin-top: 8px; }
+.meterbar i { display: block; height: 6px; }
+.HIGH .meterbar i { background: var(--high); }
+.MEDIUM .meterbar i { background: var(--med); }
+.LOW .meterbar i { background: var(--low); }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: .86rem; color: var(--ink-2); margin-top: 6px; }
+.facts b { color: var(--ink); font-weight: 600; }
+
+/* indicator list */
+.ind { width: 100%; border-collapse: collapse; }
+.ind td { padding: 7px 10px; border-bottom: 1px solid var(--rule-2); vertical-align: top; }
+.ind td.w { width: 46px; text-align: right; font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+.ind tr.pos td.w { color: var(--high); }
+.ind tr.neg td.w { color: var(--low); }
+.ind tr.zero td.w { color: var(--ink-3); }
+.ind .t { font-weight: 600; }
+.ind .d { color: var(--ink-2); font-size: .9rem; }
+.ind .e { font-family: var(--mono); font-size: .82rem; color: #3d4954; background: #f4f5f2; border-left: 2px solid var(--rule); padding: 1px 6px; margin-top: 3px; display: inline-block; word-break: break-all; }
+.ind .g { font-size: .72rem; text-transform: uppercase; color: var(--ink-3); letter-spacing: .04em; width: 90px; }
+
+/* ---- forms ---------------------------------------------------------------- */
+label { display: block; font-size: .84rem; color: var(--ink-2); margin: 0 0 3px; font-weight: 500; }
+input[type=text], input[type=password], input[type=url], input[type=search], select, textarea {
+  width: 100%; font: inherit; color: var(--ink); background: #fff; border: 1px solid #aeb3aa; padding: 5px 7px; border-radius: 0;
+}
+textarea { font-family: var(--mono); font-size: .92rem; resize: vertical; min-height: 170px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid #9fb9d1; outline-offset: -1px; border-color: #6d8aa5; }
+input[type=file] { font: inherit; font-size: .9rem; max-width: 100%; width: 100%; }
+.field { margin-bottom: 10px; }
+.row { display: flex; gap: 10px; }
+.row > .field { flex: 1; }
+.hint { font-size: .8rem; color: var(--ink-3); margin-top: 3px; }
+.check { display: flex; gap: 6px; align-items: flex-start; font-size: .88rem; color: var(--ink); font-weight: 400; }
+.check input { margin-top: 3px; }
+
+.btn {
+  display: inline-block; font: inherit; font-size: .9rem; padding: 5px 14px; cursor: pointer;
+  border: 1px solid #1f3b55; background: #24486a; color: #fff; border-radius: 0; text-decoration: none;
+}
+.btn:hover { background: #1c3a57; text-decoration: none; }
+.btn.plain { background: #f4f4f1; color: var(--ink); border-color: #a8ada4; }
+.btn.plain:hover { background: #e9eae5; }
+.btn.danger { background: #fff; color: var(--high); border-color: #d2a29d; }
+.btn.small { padding: 2px 8px; font-size: .8rem; }
+.btn[disabled] { opacity: .6; cursor: progress; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+form.inline { display: inline; margin: 0; }
+
+.tabs { display: flex; border-bottom: 1px solid var(--rule); margin-bottom: 0; }
+.tabs a {
+  padding: 7px 16px; color: var(--ink-2); border: 1px solid transparent; border-bottom: 0; margin-bottom: -1px; font-size: .92rem;
+}
+.tabs a.on { background: var(--panel); border-color: var(--rule); color: var(--ink); font-weight: 600; }
+.tabs a:hover { text-decoration: none; color: var(--ink); }
+
+.filters { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--rule); background: #fafaf7; }
+.filters .field { margin: 0; }
+.filters input[type=search] { width: 320px; max-width: 100%; }
+.filters select { width: auto; }
+
+.note { padding: 8px 12px; border: 1px solid; margin-bottom: 12px; font-size: .9rem; }
+.note.err { border-color: #dfb3ae; background: var(--high-bg); color: #6f1612; }
+.note.ok { border-color: #b9d3b2; background: var(--low-bg); color: #24502a; }
+.note.info { border-color: #c6d3de; background: #eef3f7; color: #24425c; }
+
+.pager { display: flex; gap: 4px; padding: 8px 12px; font-size: .86rem; align-items: center; flex-wrap: wrap; }
+.pager a, .pager span { padding: 1px 8px; border: 1px solid var(--rule); background: #fff; }
+.pager span.cur { background: var(--head); color: #fff; border-color: var(--head); }
+
+.empty { padding: 18px 12px; color: var(--ink-3); font-size: .9rem; }
+.mini { font-size: .8rem; color: var(--ink-3); }
+.ok-txt { color: var(--low); }
+.bad-txt { color: var(--high); }
+pre.raw {
+  font-family: var(--mono); font-size: .84rem; background: #f6f6f3; border: 1px solid var(--rule-2);
+  padding: 8px 10px; white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 360px; overflow: auto;
+}
+details.more > summary { cursor: pointer; color: var(--link); font-size: .88rem; padding: 6px 0; }
+.chain li { font-family: var(--mono); font-size: .84rem; word-break: break-all; }
+.chain { margin: 0; padding-left: 18px; }
+.heatbar { display: inline-block; height: 8px; background: #8e3a33; vertical-align: middle; margin-right: 6px; }
+progress { -webkit-appearance: none; appearance: none; border: 0; height: 6px; background: #e4e5e0; display: block; }
+progress::-webkit-progress-bar { background: #e4e5e0; }
+progress::-webkit-progress-value { background: #6b747d; }
+progress::-moz-progress-bar { background: #6b747d; }
+progress.meter { width: 100%; margin-top: 8px; }
+.HIGH progress.meter::-webkit-progress-value { background: var(--high); }
+.HIGH progress.meter::-moz-progress-bar { background: var(--high); }
+.MEDIUM progress.meter::-webkit-progress-value { background: var(--med); }
+.MEDIUM progress.meter::-moz-progress-bar { background: var(--med); }
+.LOW progress.meter::-webkit-progress-value { background: var(--low); }
+.LOW progress.meter::-moz-progress-bar { background: var(--low); }
+progress.heat { display: inline-block; width: 48px; height: 7px; vertical-align: middle; margin-right: 6px; }
+progress.heat::-webkit-progress-value { background: #8e3a33; }
+progress.heat::-moz-progress-bar { background: #8e3a33; }
+.gap { margin-bottom: 14px; }
+.after { margin-top: 12px; }
+.feedrow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+textarea.short { min-height: 80px; }
+h3.body { padding: 0 12px; margin-top: 14px; }
+
+/* ---- login / public -------------------------------------------------------- */
+.gate { max-width: 400px; margin: 70px auto; }
+.gate .panel .body { padding: 18px; }
+.gate .seal { text-align: center; margin-bottom: 14px; }
+.gate .seal b { display: block; letter-spacing: .2em; font-size: 1.2rem; }
+.gate .seal span { color: var(--ink-3); font-size: .86rem; }
+.public main { max-width: 860px; }
+.warnbox { border: 2px solid var(--high); background: var(--high-bg); padding: 14px 16px; margin-bottom: 14px; }
+.warnbox.MEDIUM { border-color: var(--med); background: var(--med-bg); }
+.warnbox.LOW { border-color: var(--low); background: var(--low-bg); }
+.warnbox h1 { font-size: 1.25rem; }
+.steps { margin: 6px 0 0; padding-left: 18px; }
+.steps li { margin-bottom: 3px; }
+footer.foot { max-width: 1320px; margin: 0 auto; padding: 10px 18px 24px; font-size: .78rem; color: var(--ink-3); border-top: 1px solid var(--rule); }
+
+/* ---- entity link chart (SVG) -------------------------------------------- */
+svg.linkchart { width: 100%; height: auto; display: block; background: #fafaf8; border: 1px solid var(--rule-2); }
+.lc-col { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; fill: var(--ink-3); }
+.lc-edge { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+.lc-edge.high { stroke: #c98680; stroke-width: 1.5; }
+.lc-edge.linked { stroke: #8aa3ba; stroke-width: 1.5; }
+.lc-node { stroke: var(--rule); stroke-width: 1; fill: #fff; }
+.lc-node.focal { fill: var(--head); stroke: var(--head); }
+.lc-node.case.HIGH { fill: var(--high-bg); stroke: #dfb3ae; }
+.lc-node.case.MEDIUM { fill: var(--med-bg); stroke: #e3cc98; }
+.lc-node.case.LOW { fill: var(--low-bg); stroke: #b9d3b2; }
+.lc-node.ent { fill: #fff; stroke: #b8c2cb; }
+svg.linkchart a:hover .lc-node { stroke: var(--head); stroke-width: 1.5; }
+.lc-title { font-size: 10.5px; font-weight: 600; fill: var(--ink); font-family: var(--mono); }
+.lc-sub { font-size: 9.5px; fill: var(--ink-2); }
+.lc-kicker { font-size: 8.5px; font-weight: 700; letter-spacing: .08em; fill: #d7c083; }
+.lc-focal-val { font-size: 11px; font-weight: 600; fill: #fff; font-family: var(--mono); }
+.lc-node.focal ~ .lc-sub { fill: #c6d0d8; }
+
+@media (max-width: 1050px) {
+  .cols, .cols-2 { grid-template-columns: 1fr; }
+  .counters { grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule-2); }
+  .counters a, .counters div.c { background: var(--panel); border-right: 0; }
+  .mast-in { height: auto; min-height: 46px; flex-wrap: wrap; gap: 0 14px; padding: 0 14px; }
+  .brand { padding: 10px 0; }
+  .who { margin-left: auto; padding: 8px 0; }
+  .mast nav {
+    order: 3; flex: 1 0 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0 -14px; padding: 0 10px;
+  }
+  .mast nav::-webkit-scrollbar { display: none; }
+  .mast nav a { white-space: nowrap; flex-shrink: 0; padding: 10px 10px 8px; }
+}
+
+@media (max-width: 768px) {
+  main { padding: 12px 12px 32px; }
+  .strip-in { padding: 5px 12px; }
+  .pagehead { flex-direction: column; align-items: stretch; gap: 10px; }
+  .pagehead .actions { width: 100%; }
+  .trunc { max-width: 220px; }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs a { white-space: nowrap; flex-shrink: 0; padding: 9px 13px; }
+  .filters { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+  .filters .field { width: 100%; }
+  .filters input[type=search], .filters select { width: 100%; }
+  .filters .field:last-child { display: flex; gap: 8px; }
+  .filters .field:last-child .btn { flex: 1; text-align: center; }
+  .feedrow { flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 640px) {
+  .brand span { display: none; }
+  .who { font-size: .8rem; gap: 8px; max-width: 65%; }
+  .who a { overflow: hidden; text-overflow: ellipsis; }
+  .counters { grid-template-columns: repeat(2, 1fr); }
+  .counters a, .counters div.c { padding: 10px 12px; }
+  .counters .n { font-size: 1.4rem; }
+  .verdict { grid-template-columns: 1fr; }
+  .verdict .score {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 6px 12px; border-right: 0; border-bottom: 1px solid var(--rule); text-align: left; padding: 12px;
+  }
+  .verdict .score .big { font-size: 1.9rem; }
+  .verdict .score progress.meter { flex: 1 0 100%; margin-top: 4px; }
+  .verdict .meta { padding: 12px; }
+  .facts { flex-direction: column; gap: 4px; }
+  .row { flex-direction: column; gap: 0; }
+  input[type=text], input[type=password], input[type=url], input[type=search], select, textarea { font-size: 16px; padding: 8px 10px; }
+  textarea { min-height: 140px; }
+  .btn { padding: 8px 14px; min-height: 38px; }
+  .btn.small { padding: 4px 10px; min-height: 30px; font-size: .82rem; }
+  .actions { gap: 6px; }
+  .gate { margin: 20px auto; }
+  .gate .panel .body { padding: 14px; }
+  .warnbox { padding: 12px; }
+  svg.linkchart { min-width: 560px; }
+  .ind, .ind tbody { display: block; width: 100%; }
+  .ind tr {
+    display: grid; grid-template-columns: 44px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule-2); padding: 8px 10px; column-gap: 8px;
+  }
+  .ind td { display: block; border-bottom: 0; padding: 0; }
+  .ind td.w { width: auto; text-align: left; grid-row: 1 / span 2; padding-top: 1px; }
+  .ind td.g { width: auto; grid-column: 2; margin-top: 4px; }
+  table.kv:not(.compact), table.kv:not(.compact) tbody { display: block; width: 100%; }
+  table.kv:not(.compact) tr { display: block; padding: 6px 0; }
+  table.kv:not(.compact) tr + tr { border-top: 1px dotted var(--rule-2); }
+  table.kv:not(.compact) th, table.kv:not(.compact) td { display: block; width: 100%; padding: 0; border-top: 0; }
+  table.kv:not(.compact) th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-3); margin-bottom: 2px; }
+  footer.foot { padding: 10px 12px 24px; }
+}
+@media print {
+  .mast, .strip, .actions, .no-print, form { display: none !important; }
+  body { background: #fff; }
+  .panel { border-color: #999; }
+}
+
+
+/* Interactive Prototype View Switcher & Notice Box */
+.view { display: none; }
+.view.on { display: block; }
+.notice-sheet {
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 20px 24px;
+  font-family: "Times New Roman", Georgia, serif;
+  line-height: 1.55;
+  color: #111;
+}
+.notice-sheet h3 {
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 1rem;
+  margin: 0 0 10px;
+  text-decoration: underline;
+}
+.preset-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <div class="mast-in">
+    <a class="brand" href="#" data-view="dash" data-nav="dash"><b>NIRIKSHAK</b><span>Cyber Fraud Analysis System</span></a>
+    <nav>
+      <a href="#" data-view="dash" data-nav="dash" class="on">Dashboard</a>
+      <a href="#" data-view="analyze" data-nav="new">New analysis</a>
+      <a href="#" data-view="cases" data-nav="cases">Case register</a>
+      <a href="#" data-view="ids" data-nav="ids">Identifiers</a>
+      <a href="#" data-view="heat" data-nav="heat">Heat-list</a>
+      <a href="#" data-view="block" data-nav="block">Blocklist</a>
+      <a href="#" data-view="users" data-nav="users">Users</a>
+      <a href="#" data-view="audit" data-nav="audit">Audit log</a>
+    </nav>
+    <div class="who">
+      <a href="#" data-view="users" data-nav="users">Inspector Sunil Yogi</a>
+      <button type="button" data-view="login" data-nav="login">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<div class="strip"><div class="strip-in">
+  <span>Cyber Crime Cell · Rajasthan Police Hackathon 2026</span>
+  <span id="strip-right">
+    <a href="#" data-view="report" data-nav="report">Citizen portal (/report)</a> ·
+    <a href="#" data-view="check" data-nav="check">Link guard (/check)</a> ·
+    <a href="https://nirikshak-ten.vercel.app/" target="_blank" rel="noopener">Live server ↗</a> ·
+    Restricted system — activity is logged
+  </span>
+</div></div>
+
+<main>
+  <!-- 1. DASHBOARD -->
+  <section id="view-dash" class="view on">
+    <div class="pagehead">
+      <div><h1>Dashboard</h1><div class="sub">State Cyber Crime Cell</div></div>
+      <div class="actions">
+        <a class="btn" href="#" data-launch-tab="message">Analyse message</a>
+        <a class="btn plain" href="#" data-launch-tab="url">URL</a>
+        <a class="btn plain" href="#" data-launch-tab="website">Website</a>
+        <a class="btn plain" href="#" data-launch-tab="apk">APK</a>
+      </div>
+    </div>
+
+    <div class="counters">
+      <a href="#" data-view="cases" data-nav="cases"><div class="n" id="stat-today">0</div><div class="l">Received today</div></a>
+      <a href="#" data-view="cases" data-nav="cases" class="alert"><div class="n" id="stat-high">0</div><div class="l">High risk, open</div></a>
+      <a href="#" data-view="cases" data-nav="cases"><div class="n" id="stat-citizen">0</div><div class="l">Citizen reports pending</div></a>
+      <a href="#" data-view="cases" data-nav="cases"><div class="n" id="stat-confirmed">0</div><div class="l">Confirmed fraud</div></a>
+      <a href="#" data-view="ids" data-nav="ids"><div class="n" id="stat-linked">0</div><div class="l">Identifiers in 2+ cases</div></a>
+      <a href="#" data-view="cases" data-nav="cases"><div class="n" id="stat-total">0</div><div class="l">Total cases</div></a>
+    </div>
+
+    <div class="cols">
+      <div class="stack">
+        <section class="panel">
+          <header><h2>Recent cases</h2><a class="aside" href="#" data-view="cases" data-nav="cases">Full register</a></header>
+          <div class="body tight"><table class="grid" id="dash-recent-table"></table></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Citizen reports awaiting review</h2><a class="aside" href="#" data-view="cases" data-nav="cases">All</a></header>
+          <div class="body tight" id="dash-citizen-queue"></div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="panel">
+          <header><h2>Most reported — 30 days</h2><a class="aside" href="#" data-view="heat" data-nav="heat">Heat-list</a></header>
+          <div class="body tight"><table class="grid" id="dash-heat-table"></table></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Records</h2></header>
+          <div class="body">
+            <table class="kv compact">
+              <tr><th>Messages</th><td id="rec-msg">0</td></tr>
+              <tr><th>URLs</th><td id="rec-url">0</td></tr>
+              <tr><th>Websites</th><td id="rec-web">0</td></tr>
+              <tr><th>Android apps</th><td id="rec-apk">0</td></tr>
+              <tr><th>Unique identifiers</th><td id="rec-ents">0</td></tr>
+              <tr><th>Blocklist entries</th><td id="rec-bl">2500</td></tr>
+            </table>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 2. NEW ANALYSIS -->
+  <section id="view-analyze" class="view">
+    <div class="pagehead"><div><h1>New analysis</h1><div class="sub">Every analysis opens a case and is saved to the register.</div></div></div>
+    <div class="preset-bar">
+      <span class="mini" style="align-self:center;">Load PS01 test case:</span>
+      <button type="button" class="btn plain small" data-preset="phishing_sms">SBI KYC Phishing SMS</button>
+      <button type="button" class="btn plain small" data-preset="digital_arrest">Digital Arrest Scam</button>
+      <button type="button" class="btn plain small" data-preset="ponzi_url">Royal777 Ponzi / Betting Site</button>
+      <button type="button" class="btn plain small" data-preset="loan_apk">Fake Loan APK</button>
+      <button type="button" class="btn plain small" data-preset="safe_sbi">Official Bank (LOW)</button>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="tabs" id="analyze-tabs">
+          <a href="#" data-tab="message" class="on">Message</a>
+          <a href="#" data-tab="url">URL / app-store link</a>
+          <a href="#" data-tab="website">Website</a>
+          <a href="#" data-tab="apk">Android APK</a>
+        </div>
+        <section class="panel">
+          <div class="body">
+            <form id="analyze-form">
+              <div class="tab-fields" data-tab="message">
+                <div class="row">
+                  <div class="field"><label>Channel</label>
+                    <select id="f-channel">
+                      <option value="sms">SMS</option>
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="email">E-mail</option>
+                      <option value="telegram">Telegram</option>
+                      <option value="social">Social media</option>
+                    </select>
+                  </div>
+                  <div class="field"><label>Sender (number / header / address)</label>
+                    <input type="text" id="f-sender" placeholder="e.g. +91 98xxxxxxxx or VM-SBIINB-S">
+                  </div>
+                </div>
+                <div class="field"><label>Message text</label>
+                  <textarea id="f-msg-text" rows="10" placeholder="Paste the message exactly as received."></textarea>
+                  <div class="hint">For e-mail, paste the full source (headers + body) to enable SPF/DKIM and Reply-To checks.</div>
+                </div>
+              </div>
+
+              <div class="tab-fields" data-tab="url" style="display:none;">
+                <div class="field"><label>URL</label>
+                  <input type="text" id="f-url-input" placeholder="https://… or play.google.com/store/apps/details?id=…">
+                  <div class="hint">Defanged forms (hxxp, [.]) are accepted.</div>
+                </div>
+              </div>
+
+              <div class="tab-fields" data-tab="website" style="display:none;">
+                <div class="field"><label>Website address</label>
+                  <input type="text" id="f-web-url" placeholder="https://…">
+                </div>
+                <div class="field"><label>— or saved page / screenshot</label>
+                  <input type="file" id="f-web-file" accept=".html,.htm,.mhtml,.mht,.txt,.png,.jpg,.jpeg,.webp,.bmp">
+                </div>
+                <div class="field"><label>— or paste HTML / OCR text</label>
+                  <textarea id="f-web-note" class="short" placeholder="Optional HTML / OCR text or leave blank to analyse URL."></textarea>
+                  <div class="hint">Webpage screenshots (.png / .jpg) uploaded on the live server are OCR-analysed automatically.</div>
+                </div>
+              </div>
+
+              <div class="tab-fields" data-tab="apk" style="display:none;">
+                <div class="field"><label>APK file (.apk — static binary parser)</label>
+                  <input type="file" id="f-apk-file" accept=".apk">
+                  <div class="hint">Static analysis only — the app is never executed. Parses AXML manifest, permissions, DEX strings &amp; x509 certs.</div>
+                </div>
+                <div class="field"><label>— or Play Store / APK download link</label>
+                  <input type="text" id="f-apk-url" placeholder="https://play.google.com/store/apps/details?id=… or direct .apk link">
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="check"><input type="checkbox" id="f-live-check" checked>
+                Run live checks (DNS, registration date, redirects, TLS, page / store fetch)</label>
+                <div class="hint">Untick on an isolated terminal. Fetches go out from this server, never from your browser.</div>
+              </div>
+              <div class="actions"><button class="btn" type="submit">Analyse and open case</button></div>
+            </form>
+          </div>
+        </section>
+      </div>
+
+      <aside class="panel">
+        <header><h2>What is checked</h2></header>
+        <div class="body mini" id="checked-hint"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 3. CASE DOSSIER DETAIL -->
+  <section id="view-case" class="view">
+    <div class="pagehead">
+      <div><h1 id="cd-title-crumb">NRK/2026/000005 — Case Dossier</h1><div class="sub">Explainable weighted forensic assessment &amp; cross-case correlation</div></div>
+      <div class="actions">
+        <a class="btn plain" href="#" data-view="cases" data-nav="cases">← Back to register</a>
+        <button class="btn plain" type="button" onclick="window.print()">Print / Save PDF</button>
+        <button class="btn" type="button" id="cd-toggle-notice">Section 94 BNSS Notice</button>
+      </div>
+    </div>
+
+    <div id="cd-verdict" class="verdict HIGH">
+      <div class="score">
+        <div class="big" id="cd-score-big">88</div>
+        <div class="of">/ 100 · <span id="cd-risk-label">HIGH RISK</span></div>
+        <progress class="meter" id="cd-meter" max="100" value="88"></progress>
+      </div>
+      <div class="meta">
+        <h1 id="cd-case-title">Case Title</h1>
+        <div class="facts" id="cd-facts"></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="stack">
+        <section class="panel">
+          <header><h2>Why it scored this way</h2><span class="aside">Explainable weighted indicators</span></header>
+          <div class="body tight"><table class="ind" id="cd-ind-table"></table></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Cross-case link graph</h2><span class="aside">Shared IOCs across cases</span></header>
+          <div class="body"><svg class="linkchart" id="cd-svg-graph"></svg></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Extracted identifiers (IOCs)</h2></header>
+          <div class="body tight"><table class="grid" id="cd-ioc-table"></table></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Raw submission &amp; forensic notes</h2></header>
+          <div class="body"><pre class="raw" id="cd-raw"></pre></div>
+        </section>
+
+        <section class="panel" id="cd-notice-panel" style="display:none;">
+          <header><h2>Statutory Notice — Section 94 BNSS / Section 91 CrPC</h2><button type="button" class="btn plain small" onclick="window.print()">Print notice</button></header>
+          <div class="body"><div class="notice-sheet" id="cd-notice-preview"></div></div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="panel">
+          <header><h2>Technical details</h2></header>
+          <div class="body"><table class="kv" id="cd-tech-kv"></table></div>
+        </section>
+
+        <section class="panel">
+          <header><h2>Officer workflow</h2></header>
+          <div class="body">
+            <div class="field"><label>Case status</label>
+              <select id="cd-status-sel">
+                <option value="open">Open</option>
+                <option value="investigating">Under investigation</option>
+                <option value="closed_fraud">Confirmed fraud</option>
+                <option value="closed_benign">Closed (benign)</option>
+              </select>
+            </div>
+            <div class="field"><label>Investigation notes</label>
+              <textarea id="cd-notes-box" class="short"></textarea>
+            </div>
+            <div class="actions"><button class="btn" type="button" id="cd-save-note">Save case update</button></div>
+            <div id="cd-saved-msg" class="note ok after" style="display:none;">Case status and officer notes updated.</div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 4. CASE REGISTER -->
+  <section id="view-cases" class="view">
+    <div class="pagehead">
+      <div><h1>Case register</h1><div class="sub" id="cases-count-sub">5 records</div></div>
+      <div class="actions">
+        <button class="btn plain" type="button" id="export-csv-btn">Export CSV</button>
+        <a class="btn" href="#" data-view="analyze" data-nav="new">New analysis</a>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="filters">
+        <div class="field"><label>Search</label><input type="search" id="cases-search" placeholder="Case no., text, phone, UPI ID, domain…"></div>
+        <div class="field"><label>Type</label>
+          <select id="cases-type"><option value="">All</option><option value="message">Message</option><option value="url">URL</option><option value="website">Website</option><option value="apk">Android APK</option></select>
+        </div>
+        <div class="field"><label>Risk</label>
+          <select id="cases-risk"><option value="">All</option><option value="HIGH">HIGH</option><option value="MEDIUM">MEDIUM</option><option value="LOW">LOW</option></select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="cases-status"><option value="">All</option><option value="open">Open</option><option value="investigating">Under investigation</option><option value="closed_fraud">Confirmed fraud</option><option value="closed_benign">Closed (benign)</option></select>
+        </div>
+        <div class="field">
+          <button class="btn" type="button" id="cases-filter-btn">Filter</button>
+          <button class="btn plain" type="button" id="cases-reset-btn">Reset</button>
+        </div>
+      </div>
+      <div class="body tight"><table class="grid" id="cases-table"></table></div>
+    </section>
+  </section>
+
+  <!-- 5. IDENTIFIERS -->
+  <section id="view-ids" class="view">
+    <div class="pagehead"><div><h1>Extracted identifiers</h1><div class="sub" id="id-count-sub">Indexed across all cases</div></div></div>
+    <section class="panel">
+      <div class="filters">
+        <div class="field"><label>Search value</label><input type="search" id="id-search" placeholder="UPI ID, phone, domain, IFSC, package…"></div>
+        <div class="field"><label>Type</label>
+          <select id="id-type"><option value="">All types</option><option value="UPI ID">UPI ID</option><option value="Domain">Domain</option><option value="URL">URL</option><option value="Phone">Phone</option><option value="Bank A/C">Bank A/C</option><option value="APK Package">APK Package</option><option value="Crypto Wallet">Crypto Wallet</option></select>
+        </div>
+        <div class="field"><label>Correlation</label>
+          <select id="id-corr"><option value="">All identifiers</option><option value="linked">Appears in 2+ cases</option></select>
+        </div>
+        <div class="field">
+          <button class="btn" type="button" id="id-filter-btn">Filter</button>
+          <button class="btn plain" type="button" id="id-reset-btn">Reset</button>
+        </div>
+      </div>
+      <div class="body tight"><table class="grid" id="id-table"></table></div>
+    </section>
+  </section>
+
+  <!-- 6. HEAT-LIST -->
+  <section id="view-heat" class="view">
+    <div class="pagehead">
+      <div><h1>Heat-list — frequently reported identifiers</h1><div class="sub">Ranked by distinct cases within the selected time window (excluding benign closures)</div></div>
+      <div class="actions"><button class="btn plain" type="button" onclick="window.print()">Print Heat-list</button></div>
+    </div>
+    <div class="cols-2">
+      <section class="panel"><header><h2>Domain / URL</h2></header><div class="body tight" id="heat-domains"></div></section>
+      <section class="panel"><header><h2>Phone number</h2></header><div class="body tight" id="heat-phones"></div></section>
+      <section class="panel"><header><h2>UPI ID</h2></header><div class="body tight" id="heat-upis"></div></section>
+      <section class="panel"><header><h2>App package &amp; signing cert</h2></header><div class="body tight" id="heat-apks"></div></section>
+      <section class="panel"><header><h2>Bank account</h2></header><div class="body tight" id="heat-banks"></div></section>
+      <section class="panel"><header><h2>Crypto wallet</h2></header><div class="body tight" id="heat-crypto"></div></section>
+    </div>
+  </section>
+
+  <!-- 7. BLOCKLIST -->
+  <section id="view-block" class="view">
+    <div class="pagehead"><div><h1>Blocklist &amp; intelligence feeds</h1><div class="sub">2500 indicators on blocklist · matches force HIGH risk (score floor 75)</div></div></div>
+    <div class="cols">
+      <section class="panel">
+        <div class="filters">
+          <div class="field"><label>Search</label><input type="search" id="bl-search" placeholder="Domain, URL, phone, UPI ID, package…"></div>
+          <div class="field"><label>Type</label><select id="bl-type"><option value="">All</option><option value="Domain">Domain</option><option value="UPI ID">UPI ID</option><option value="APK Package">APK Package</option></select></div>
+          <div class="field"><button class="btn" type="button" id="bl-filter-btn">Filter</button> <button class="btn plain" type="button" id="bl-reset-btn">Reset</button></div>
+        </div>
+        <div class="body tight"><table class="grid" id="bl-table"></table></div>
+      </section>
+
+      <aside class="stack">
+        <section class="panel">
+          <header><h2>Add indicator manually</h2></header>
+          <div class="body">
+            <form id="bl-add-form">
+              <div class="field"><label>Type</label><select id="bl-new-type"><option value="Domain">Domain</option><option value="UPI ID">UPI ID</option><option value="APK Package">APK Package</option></select></div>
+              <div class="field"><label>Value</label><input type="text" id="bl-new-val" placeholder="e.g. sbi-kyc-update.top or +919812345678"></div>
+              <div class="field"><label>Reference / FIR / NCRP ack no.</label><input type="text" id="bl-new-note" placeholder="e.g. NCRP #31904221 / FIR 42/2026"></div>
+              <button class="btn" type="submit">Add to blocklist</button>
+            </form>
+          </div>
+        </section>
+        <section class="panel">
+          <header><h2>External threat feeds</h2></header>
+          <div class="body">
+            <p class="mini">Pull active phishing and malware URLs/domains from public feeds into the blocklist.</p>
+            <div class="feedrow"><b>OpenPhish community feed</b><span class="tag ok-txt">Synced</span></div>
+            <div class="feedrow"><b>Phishing Army active blocklist</b><span class="tag ok-txt">2,500 active</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 8. USERS -->
+  <section id="view-users" class="view">
+    <div class="pagehead"><div><h1>Officer accounts</h1><div class="sub">Manage workstation access and privileges</div></div></div>
+    <div class="cols">
+      <section class="panel">
+        <header><h2>Registered officers</h2></header>
+        <div class="body tight">
+          <table class="grid" id="users-table">
+            <tr><th>Username</th><th>Officer</th><th>Badge / PIS</th><th>Unit</th><th>Role</th><th>Status</th><th>Last login</th></tr>
+            <tr><td class="mono">insp.sunil</td><td>Inspector Sunil Yogi</td><td class="mono">CYB-2026-01</td><td>State Cyber Crime Cell</td><td><span class="tag">admin</span></td><td class="ok-txt">active</td><td class="dim">22 Nov 2026, 04:29</td></tr>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <header><h2>Create officer account</h2></header>
+        <div class="body">
+          <form id="users-create-form">
+            <div class="field"><label>Username</label><input type="text" id="u-new-user" placeholder="e.g. si.sharma"></div>
+            <div class="field"><label>Full name</label><input type="text" id="u-new-name" placeholder="Officer full name"></div>
+            <div class="row">
+              <div class="field"><label>Rank</label><input type="text" placeholder="SI / Insp. / DSP"></div>
+              <div class="field"><label>Badge / PIS no.</label><input type="text" id="u-new-badge" value="CYB-2026-02"></div>
+            </div>
+            <div class="field"><label>Unit / station</label><input type="text" id="u-new-unit" value="Cyber Crime Cell"></div>
+            <div class="field"><label>Role</label><select id="u-new-role"><option value="officer">Investigating Officer</option><option value="admin">Admin</option></select></div>
+            <button class="btn" type="submit">Create account</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- 9. AUDIT -->
+  <section id="view-audit" class="view">
+    <div class="pagehead"><div><h1>Audit log</h1><div class="sub">Recorded officer and system security events</div></div></div>
+    <section class="panel">
+      <div class="filters">
+        <div class="field"><label>Filter</label><input type="search" id="audit-search" placeholder="User, action, case no., detail…"></div>
+        <div class="field"><button class="btn" type="button" id="audit-filter-btn">Filter</button> <button class="btn plain" type="button" id="audit-reset-btn">Reset</button></div>
+      </div>
+      <div class="body tight"><table class="grid" id="audit-table"></table></div>
+    </section>
+  </section>
+
+  <!-- 10. CITIZEN PORTAL (/report) -->
+  <section id="view-report" class="view">
+    <div class="pagehead"><div><h1>Report suspicious fraud (Public Portal)</h1><div class="sub">Submit an SMS, WhatsApp forward, suspicious URL, or fake app for instant risk assessment.</div></div></div>
+    <section class="panel">
+      <div class="body">
+        <form id="public-report-form">
+          <div class="field"><label>Paste suspicious message or link</label>
+            <textarea id="pub-input" class="short" placeholder="e.g. https://sbi-kyc-update-online.top or scam SMS..."></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit">Check &amp; report to Cyber Cell</button>
+            <button class="btn plain" type="button" onclick="document.getElementById('pub-input').value='Dear Customer, Your SBI YONO account will be suspended today. Update PAN at https://sbi-kyc-update-online.top/login or pay to sbi.verify@okaxis';">Fill sample scam</button>
+          </div>
+        </form>
+        <div id="pub-result" class="warnbox after" style="display:none;"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- 11. PRE-OPEN LINK GUARD (/check) -->
+  <section id="view-check" class="view">
+    <div class="pagehead"><div><h1>Check a link before opening (/check)</h1><div class="sub">Proactive safety check for citizens and browser extensions.</div></div></div>
+    <section class="panel">
+      <div class="body">
+        <form id="link-check-form">
+          <div class="field"><label>URL to verify</label>
+            <input type="text" id="lc-url-input" value="https://sbi-kyc-update-online.top/login">
+          </div>
+          <div class="actions"><button class="btn" type="submit">Inspect URL safety</button></div>
+        </form>
+        <div id="lc-result" class="warnbox after" style="display:none;"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- 12. OFFICER SIGN-IN (/login) -->
+  <section id="view-login" class="view">
+    <div class="gate">
+      <div class="seal"><b>NIRIKSHAK</b><span>Cyber Crime Cell — authorised personnel only</span></div>
+      <section class="panel">
+        <header><h2>Officer sign-in</h2></header>
+        <div class="body">
+          <form id="login-form">
+            <div class="field"><label>Username</label><input type="text" value="insp.sunil"></div>
+            <div class="field"><label>Password</label><input type="password" value="••••••••••••••"></div>
+            <button class="btn" type="submit">Sign in</button>
+          </form>
+        </div>
+      </section>
+      <p class="mini" style="margin-top:8px;">Members of the public: <a href="#" data-view="report" data-nav="report">report a fraud</a> or <a href="#" data-view="check" data-nav="check">check a link</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  NIRIKSHAK (PS01) — Scam Message, Phishing Link, Fake Loan/Investment App &amp; Website Analysis System · Rajasthan Police Hackathon 2026 · Team Void-Dev
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var BLOCKLIST = [
+    { type: "Domain", value: "sbi-kyc-update-online.top", source: "CERT / Police Blocklist", note: "NCRPB #31904221", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "royal777-vip.bet", source: "State Cyber Cell Blocklist", note: "FIR 42/2026", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "6762330791-rejestr.storage.googleapis.com", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "6842441133-doradztwo.storage.googleapis.com", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "658459.help", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "67ftyesy.vercel.app", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "6583994302.cfd", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "Domain", value: "679black.wixsite.com", source: "Phishing Army active blocklist", note: "", added: "22 Nov 2026, 03:50" },
+    { type: "UPI ID", value: "sbi.verify@okaxis", source: "Mule Account Feed", note: "Linked 3 cases", added: "22 Nov 2026, 04:05" },
+    { type: "APK Package", value: "com.fast.rupee.loan", source: "Fake Loan App List", note: "Extortion APK", added: "22 Nov 2026, 04:10" }
+  ];
+
+  var AUDIT_LOG = [
+    { time: "22 Nov 2026 04:29:47", user: "insp.sunil", ip: "49.47.18.176", action: "login", target: "insp.sunil", detail: "" },
+    { time: "22 Nov 2026 04:12:18", user: "insp.sunil", ip: "49.47.18.176", action: "analyse", target: "NRK/2026/000005", detail: "message: SBI YONO KYC Expiry SMS -> HIGH 88" },
+    { time: "22 Nov 2026 04:08:02", user: "insp.sunil", ip: "49.47.18.176", action: "analyse", target: "NRK/2026/000004", detail: "apk: QuickCash_Instant_Loan_v4.apk -> HIGH 94" },
+    { time: "22 Nov 2026 04:01:44", user: "insp.sunil", ip: "49.47.18.176", action: "analyse", target: "NRK/2026/000003", detail: "website: https://royal777-vip.bet -> HIGH 86" },
+    { time: "22 Nov 2026 03:50:52", user: "insp.sunil", ip: "49.47.18.176", action: "feed_sync", target: "phishing_army", detail: "Phishing Army active blocklist: 0 URLs, 2500 domains processed" },
+    { time: "22 Nov 2026 03:48:11", user: "insp.sunil", ip: "49.47.18.176", action: "view_case", target: "NRK/2026/000002", detail: "" },
+    { time: "22 Nov 2026 03:48:07", user: "insp.sunil", ip: "49.47.18.176", action: "analyse", target: "NRK/2026/000002", detail: "website: https://jsdl.in/RSL-DJF1775492799 — Access Denied -> LOW 4" },
+    { time: "22 Nov 2026 03:46:01", user: "insp.sunil", ip: "49.47.18.176", action: "analyse", target: "NRK/2026/000001", detail: "url: https://github.com/Sunil56224972 -> LOW 0" },
+    { time: "22 Nov 2026 03:05:43", user: "public", ip: "49.47.18.176", action: "link_check", target: "https://sbi-kyc-update-online.top", detail: "HIGH 88" },
+    { time: "21 Nov 2026 23:07:50", user: "insp.sunil", ip: "127.0.0.1", action: "setup", target: "insp.sunil", detail: "first administrator account created" }
+  ];
+
+  var CASES = [
+    {
+      id: 5,
+      case_no: "NRK/2026/000005",
+      kind: "message",
+      source: "officer",
+      channel: "SMS / WhatsApp",
+      sender: "+919876543210",
+      title: "Dear Customer, Your SBI YONO account will be suspended today — PAN KYC",
+      category: "KYC Phishing",
+      risk_level: "HIGH",
+      risk_score: 88,
+      status: "investigating",
+      created_at: "22 Nov 2026, 04:12",
+      sha256: "9f4c81e2a7d14b3c0981a7b3c4e2910d8f2c112a4b887e910f12445571b0e82a",
+      raw: "Dear Customer, Your SBI YONO account will be suspended today due to pending PAN-KYC.\nUpdate immediately at https://sbi-kyc-update-online.top/login or transfer Rs 1 verification fee to sbi.verify@okaxis or call +91-9876543210.\nA/C 50100482910 IFSC HDFC0001234",
+      indicators: [
+        { code: "url.brand_typosquat", group: "DOMAIN", weight: 35, title: "Brand impersonation in domain", desc: "Domain impersonates protected entity State Bank of India (sbi) on high-risk TLD .top.", ev: "sbi-kyc-update-online.top" },
+        { code: "net.rdap_new_domain", group: "NETWORK", weight: 25, title: "Newly registered phishing domain", desc: "RDAP registration age is 3 days via NameCheap, Inc.; origin IP masked by Cloudflare AS13335.", ev: "Registrar: NameCheap · Age: 3 days" },
+        { code: "msg.kyc_coercion", group: "CONTENT", weight: 20, title: "Account suspension urgency & UPI lure", desc: "Threatens immediate banking suspension alongside direct UPI collect handle.", ev: "suspended today + sbi.verify@okaxis" },
+        { code: "ioc.blocklist_hit", group: "INTEL", weight: 8, title: "Matched active cyber-cell blocklist & 2 linked cases", desc: "UPI handle and domain already linked to NRK/2026/000004 (Loan APK) and NRK/2026/000003.", ev: "sbi.verify@okaxis · 3 cases" }
+      ],
+      iocs: [
+        { kind: "UPI ID", val: "sbi.verify@okaxis", extra: "Axis Bank / OkAxis PSP", cases: 3 },
+        { kind: "Phone", val: "+919876543210", extra: "Indian Mobile Sender", cases: 2 },
+        { kind: "Bank A/C", val: "50100482910", extra: "IFSC: HDFC0001234 (Jaipur Branch)", cases: 2 },
+        { kind: "Domain", val: "sbi-kyc-update-online.top", extra: "NameCheap · AS13335 Cloudflare", cases: 2 },
+        { kind: "URL", val: "https://sbi-kyc-update-online.top/login", extra: "Credential & OTP form", cases: 1 }
+      ],
+      tech: [
+        ["Channel / Sender", "SMS · +919876543210"],
+        ["Registrar / Age", "NameCheap, Inc. · 3 days old (2026-11-19)"],
+        ["DNS / ASN", "104.21.48.12 (AS13335 Cloudflare, Inc.)"],
+        ["Redirect Chain", "302 https://sbi-kyc-update-online.top/login -> /kyc-pan-verify"],
+        ["TLS Certificate", "Let's Encrypt R3 (valid, brand mismatch)"]
+      ],
+      notes: "Section 94 BNSS preservation notice generated for Axis Bank Nodal Desk (sbi.verify@okaxis) and HDFC Bank (50100482910)."
+    },
+    {
+      id: 4,
+      case_no: "NRK/2026/000004",
+      kind: "apk",
+      source: "officer",
+      channel: "Android APK",
+      sender: "WhatsApp File",
+      title: "QuickCash_Instant_Loan_v4.apk (com.fast.rupee.loan)",
+      category: "Predatory Loan APK",
+      risk_level: "HIGH",
+      risk_score: 94,
+      status: "investigating",
+      created_at: "22 Nov 2026, 04:08",
+      sha256: "8a3f91c2b701e9201148d1f73c22e809441a9b77c2d019f45e11c320b9d401e9",
+      raw: "Static APK Analysis Summary:\nPackage: com.fast.rupee.loan (QuickCash Instant Loan v4.2)\nDangerous Permissions: READ_SMS, RECEIVE_SMS, READ_CONTACTS, READ_CALL_LOG, SYSTEM_ALERT_WINDOW\nEmbedded C2: http://45.142.120.11/upload_contacts.php\nRepayment UPI: sbi.verify@okaxis",
+      indicators: [
+        { code: "apk.extortion_perms", group: "APK", weight: 35, title: "Contact, SMS & call-log harvesting permissions", desc: "Manifest declares READ_SMS, READ_CONTACTS, and READ_CALL_LOG typical of predatory loan extortion apps.", ev: "READ_SMS, READ_CONTACTS, READ_CALL_LOG" },
+        { code: "apk.playstore_missing", group: "STORE", weight: 30, title: "Not listed / removed from Google Play Store", desc: "Package com.fast.rupee.loan is absent from official Play Store (sideloaded distribution).", ev: "com.fast.rupee.loan -> 404 on Play Store" },
+        { code: "apk.cleartext_c2", group: "DEX", weight: 20, title: "Hardcoded cleartext C2 & Telegram exfiltration URL", desc: "DEX strings contain unencrypted IP upload endpoint for victim contact book harvesting.", ev: "http://45.142.120.11/upload_contacts.php" },
+        { code: "apk.debug_cert_upi", group: "CERT", weight: 9, title: "Self-signed debug certificate + shared mule UPI", desc: "Signed with CN=Android Debug; embedded repayment UPI matches NRK/2026/000005.", ev: "Cert SHA-256: 8a3f91c2...d401e912" }
+      ],
+      iocs: [
+        { kind: "APK Package", val: "com.fast.rupee.loan", extra: "v4.2 (versionCode 42)", cases: 2 },
+        { kind: "Cert SHA-256", val: "8a3f91c2b701...b9d401e9", extra: "CN=Android Debug (Self-signed)", cases: 2 },
+        { kind: "UPI ID", val: "sbi.verify@okaxis", extra: "Shared with KYC SMS campaign", cases: 3 },
+        { kind: "IP address", val: "45.142.120.11", extra: "Harvesting C2 Server", cases: 1 },
+        { kind: "Icon aHash", val: "f8c4e2a190b37112", extra: "64-bit launcher perceptual hash", cases: 1 }
+      ],
+      tech: [
+        ["Package Name", "com.fast.rupee.loan (v4.2 / SDK 23->33)"],
+        ["AXML Permissions", "READ_SMS, RECEIVE_SMS, READ_CONTACTS, READ_CALL_LOG, SYSTEM_ALERT_WINDOW"],
+        ["Google Play Check", "Absent / Removed from Play Store (sideloaded APK)"],
+        ["Signing Cert (v2)", "CN=Android Debug, O=Android (SHA-256: 8a3f91c2...)"],
+        ["DEX C2 Strings", "http://45.142.120.11/upload_contacts.php · api.telegram.org"]
+      ],
+      notes: "100% static binary extraction performed in memory without executing the APK."
+    },
+    {
+      id: 3,
+      case_no: "NRK/2026/000003",
+      kind: "website",
+      source: "citizen",
+      channel: "Citizen Portal",
+      sender: "Telegram VIP",
+      title: "Royal777 Color Prediction & VIP Ponzi ROI (https://royal777-vip.bet)",
+      category: "Ponzi / Betting",
+      risk_level: "HIGH",
+      risk_score: 86,
+      status: "open",
+      created_at: "22 Nov 2026, 04:01",
+      sha256: "4c19b0a8992e1a54f11033bc771e208899aa0144bcdef9871234abcd77e12f09",
+      raw: "Screenshot OCR + HTML Inspection:\nROYAL777 VIP CLUB — Guaranteed 200% Daily Return on Color Prediction & Task Recharge!\nDeposit Rs 1,000 via UPI sbi.verify@okaxis or USDT TRON TJ8x91mP2kL92mP4rV8sQ3nW7xY2zA9cB1.\nRefer 5 friends for 3-tier MLM VIP Commission! Support Phone: +91-9876543210.",
+      indicators: [
+        { code: "web.ponzi_mlm_roi", group: "CONTENT", weight: 35, title: "Guaranteed high-return Ponzi & MLM referral claims", desc: "Page and screenshot OCR advertise 'Guaranteed 200% Daily Return' with 3-tier referral commissions.", ev: "Guaranteed 200% Daily Return + MLM" },
+        { code: "web.illegal_betting", group: "BETTING", weight: 25, title: "Illegal color-prediction & wagering interface", desc: "Contains live parity/colour-prediction bet placement controls and VIP Telegram channel funnels.", ev: "Royal777 Color Prediction" },
+        { code: "net.blocklist_domain", group: "INTEL", weight: 26, title: "Domain on cyber-cell blocklist + shared mule IOCs", desc: "Shares UPI ID sbi.verify@okaxis and sender phone +919876543210 with NRK/2026/000005.", ev: "royal777-vip.bet · sbi.verify@okaxis" }
+      ],
+      iocs: [
+        { kind: "Domain", val: "royal777-vip.bet", extra: "Blocklist Hit · Reg: 5 days ago", cases: 2 },
+        { kind: "UPI ID", val: "sbi.verify@okaxis", extra: "Axis Bank PSP Handle", cases: 3 },
+        { kind: "Crypto Wallet", val: "TJ8x91mP2kL92mP4rV8sQ3nW7xY2zA9cB1", extra: "TRON (TRC-20 USDT)", cases: 1 },
+        { kind: "Phone", val: "+919876543210", extra: "WhatsApp / Telegram Desk", cases: 2 }
+      ],
+      tech: [
+        ["Page Source / OCR", "HTML + Screenshot OCR extracted (Cloud OCR fallback)"],
+        ["Offsite Payment", "Direct UPI intent link + TRC-20 USDT deposit address"],
+        ["Registrar / TLS", "Gname.com Pte. Ltd. · Age: 5 days"],
+        ["Matched Rules", "Ponzi ROI (35) + Color Prediction (25) + Blocklist (26)"]
+      ],
+      notes: "Submitted via public /report portal by citizen victim."
+    },
+    {
+      id: 2,
+      case_no: "NRK/2026/000002",
+      kind: "website",
+      source: "officer",
+      channel: "Website",
+      sender: "",
+      title: "https://jsdl.in/RSL-DJF1775492799 — Access Denied",
+      category: "",
+      risk_level: "LOW",
+      risk_score: 4,
+      status: "open",
+      created_at: "22 Nov 2026, 03:48",
+      sha256: "2b81f01e773c91a440d911ab5224c8901234567890abcdef1234567890abcdef",
+      raw: "URL fetched: https://jsdl.in/RSL-DJF1775492799 -> Redirected to https://www.justdial.com/RSL-DJF1775492799 -> Akamai CDN Edge Access Denied (HTTP 403).",
+      indicators: [
+        { code: "url.shortener_resolved", group: "URL", weight: 4, title: "URL shortener resolved to established domain", desc: "jsdl.in redirects cleanly to www.justdial.com (established domain; Akamai WAF returned 403 to datacenter probe).", ev: "jsdl.in -> www.justdial.com" }
+      ],
+      iocs: [
+        { kind: "Domain", val: "www.justdial.com", extra: "Resolved final destination", cases: 1 },
+        { kind: "URL", val: "https://www.justdial.com/RSL-DJF1775492799", extra: "Target URL", cases: 1 },
+        { kind: "Domain", val: "errors.edgesuite.net", extra: "Akamai edge error page", cases: 1 }
+      ],
+      tech: [
+        ["Final URL", "https://www.justdial.com/RSL-DJF1775492799"],
+        ["HTTP Status", "403 Access Denied (Akamai Edgesuite WAF)"],
+        ["Risk Assessment", "LOW (4/100) — No phishing, KYC, or malware signals found"]
+      ],
+      notes: ""
+    },
+    {
+      id: 1,
+      case_no: "NRK/2026/000001",
+      kind: "url",
+      source: "officer",
+      channel: "URL",
+      sender: "",
+      title: "https://github.com/Sunil56224972",
+      category: "",
+      risk_level: "LOW",
+      risk_score: 0,
+      status: "open",
+      created_at: "22 Nov 2026, 03:45",
+      sha256: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      raw: "URL inspected: https://github.com/Sunil56224972\nHTTP 200 OK · Established domain github.com · TLS valid (DigiCert Global G2 TLS RSA SHA256 2020 CA1).",
+      indicators: [
+        { code: "url.allowlist_clean", group: "TRUST", weight: 0, title: "No threat signals detected", desc: "github.com is a verified established platform with valid DigiCert TLS and zero blocklist hits.", ev: "140.82.113.3 · HTTP 200" }
+      ],
+      iocs: [
+        { kind: "Domain", val: "github.com", extra: "Established developer platform", cases: 1 },
+        { kind: "IP address", val: "140.82.113.3", extra: "AS36459 GitHub, Inc.", cases: 1 },
+        { kind: "URL", val: "https://github.com/Sunil56224972", extra: "Submitted profile URL", cases: 1 }
+      ],
+      tech: [
+        ["Final URL", "https://github.com/Sunil56224972"],
+        ["DNS / IP", "140.82.113.3 (GitHub, Inc.)"],
+        ["TLS Certificate", "CN=github.com · DigiCert Global G2 CA"]
+      ],
+      notes: ""
+    }
+  ];
+
+  var PRESETS = {
+    phishing_sms: {
+      kind: "message",
+      channel: "sms",
+      sender: "+919876543210",
+      text: "Dear Customer, Your SBI YONO account will be suspended today due to pending PAN-KYC. Update immediately at https://sbi-kyc-update-online.top/login or transfer Rs 1 verification to sbi.verify@okaxis. Helpline +91-9876543210"
+    },
+    digital_arrest: {
+      kind: "message",
+      channel: "whatsapp",
+      sender: "+918800112233",
+      text: "URGENT NOTICE FROM MUMBAI CYBER CRIME / CBI: Your Aadhaar is linked to illegal parcel & money laundering FIR #9921. You are under DIGITAL ARREST on Skype. Transfer refundable bail verification Rs 48,000 immediately to A/C 50100482910 IFSC HDFC0001234 or cbi.escrow@ybl to avoid arrest."
+    },
+    ponzi_url: {
+      kind: "website",
+      url: "https://royal777-vip.bet/join",
+      html: "ROYAL777 VIP CLUB — Guaranteed 200% Daily Return on Color Prediction & Task Recharge! Join Telegram @royal777vip and deposit via UPI royal777@okaxis"
+    },
+    loan_apk: {
+      kind: "apk",
+      url: "https://quickcash-loan-app.xyz/download/QuickCash_Instant_Loan_v4.apk"
+    },
+    safe_sbi: {
+      kind: "url",
+      url: "https://onlinesbi.sbi/"
+    }
+  };
+
+  var currentCaseId = 5;
+  var currentTab = "message";
+
+  function esc(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function showView(viewId, navKey) {
+    var views = document.querySelectorAll(".view");
+    for (var i = 0; i < views.length; i++) {
+      views[i].classList.remove("on");
+    }
+    var target = document.getElementById("view-" + viewId);
+    if (target) target.classList.add("on");
+
+    var navLinks = document.querySelectorAll(".mast nav a[data-view]");
+    for (var j = 0; j < navLinks.length; j++) {
+      navLinks[j].classList.toggle("on", navLinks[j].getAttribute("data-nav") === navKey);
+    }
+
+    var isPublic = (viewId === "report" || viewId === "check");
+    document.body.classList.toggle("public", isPublic);
+    var stripRight = document.getElementById("strip-right");
+    if (stripRight) {
+      stripRight.innerHTML = (isPublic
+        ? "National cyber crime helpline: <b>1930</b> · cybercrime.gov.in · <a href='#' data-view='dash' data-nav='dash'>Back to officer console</a>"
+        : "<a href='#' data-view='report' data-nav='report'>Citizen portal (/report)</a> · <a href='#' data-view='check' data-nav='check'>Link guard (/check)</a> · <a href='https://nirikshak-ten.vercel.app/' target='_blank' rel='noopener'>Live server ↗</a> · Restricted system — activity is logged");
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function setAnalyzeTab(kind) {
+    currentTab = kind;
+    var tabs = document.querySelectorAll("#analyze-tabs a");
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle("on", tabs[i].getAttribute("data-tab") === kind);
+    }
+    var panels = document.querySelectorAll(".tab-fields");
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].style.display = panels[j].getAttribute("data-tab") === kind ? "block" : "none";
+    }
+    var hintEl = document.getElementById("checked-hint");
+    if (hintEl) {
+      var hints = {
+        message: "<p>Scam phrasing (KYC block, electricity cut-off, parcel, digital arrest, jobs, investment, loan, prize, refund, sextortion, betting), urgency, requests for OTP/PIN/remote-access, sender type, brand claims.</p><p>Every link inside the message is analysed as a URL. UPI IDs, phone numbers, bank accounts, wallets, Telegram/WhatsApp handles are extracted and cross-matched with earlier cases.</p>",
+        url: "<p>Look-alike and typosquatted domains, punycode, shorteners, free hosting, risky TLDs, lure words, direct APK links.</p><p>Live: domain registration date and registrar (RDAP), DNS and hosting network, full redirect chain, TLS certificate, Google Safe Browsing, and local blocklist.</p>",
+        website: "<p>Guaranteed-return and MLM referral language, betting/colour-prediction, task/recharge schemes, fake loan offers, fake RBI/SEBI claims, forms harvesting OTP/card/Aadhaar, offsite form posting, obfuscated scripts, and Telegram-bot exfiltration.</p><p>Uploaded webpage screenshots (.png / .jpg) are OCR-analysed automatically.</p>",
+        apk: "<p>Manifest: package, version, SDK levels, permissions, components, SMS/boot receivers, launcher visibility. Signing certificates (v1/v2/v3) with fingerprints.</p><p>Static analysis only — no code is executed. Checks Play Store presence, DEX strings, Telegram C2s, and launcher icon perceptual hash (aHash).</p>"
+      };
+      hintEl.innerHTML = hints[kind] || hints.message;
+    }
+  }
+
+  function renderDashboard() {
+    var total = CASES.length;
+    var highOpen = CASES.filter(function (c) { return c.risk_level === "HIGH" && c.status !== "closed_fraud" && c.status !== "closed_benign"; }).length;
+    var citizenOpen = CASES.filter(function (c) { return c.source === "citizen" && c.status === "open"; }).length;
+    var confirmed = CASES.filter(function (c) { return c.status === "closed_fraud"; }).length;
+    var allEnts = collectAllIdentifiers();
+    var linked = allEnts.filter(function (e) { return e.cases >= 2; }).length;
+
+    document.getElementById("stat-today").textContent = total;
+    document.getElementById("stat-high").textContent = highOpen;
+    document.getElementById("stat-citizen").textContent = citizenOpen;
+    document.getElementById("stat-confirmed").textContent = confirmed;
+    document.getElementById("stat-linked").textContent = linked;
+    document.getElementById("stat-total").textContent = total;
+
+    var recentHtml = "<tr><th>Case no.</th><th>Type</th><th>Subject</th><th>Risk</th><th class='num'>Score</th><th>Status</th><th>Received</th></tr>";
+    CASES.slice(0, 6).forEach(function (c) {
+      var citizenTag = c.source === "citizen" ? " <span class='tag citizen'>citizen</span>" : "";
+      recentHtml += "<tr>" +
+        "<td class='nowrap'><a href='#' data-open-case='" + c.id + "'>" + esc(c.case_no) + "</a></td>" +
+        "<td class='nowrap'>" + esc(capKind(c.kind)) + citizenTag + "</td>" +
+        "<td><span class='trunc'>" + esc(c.title) + "</span>" + (c.category ? "<span class='dim'>" + esc(c.category) + "</span>" : "") + "</td>" +
+        "<td><span class='risk " + esc(c.risk_level) + "'>" + esc(c.risk_level) + "</span></td>" +
+        "<td class='num'>" + c.risk_score + "</td>" +
+        "<td><span class='st " + esc(c.status) + "'>" + esc(statusLabel(c.status)) + "</span></td>" +
+        "<td class='nowrap dim'>" + esc(c.created_at) + "</td>" +
+        "</tr>";
+    });
+    document.getElementById("dash-recent-table").innerHTML = recentHtml;
+
+    var q = CASES.filter(function (c) { return c.source === "citizen"; });
+    var qHtml = "";
+    if (!q.length) {
+      qHtml = "<div class='empty'>Queue is clear.</div>";
+    } else {
+      qHtml = "<table class='grid'><tr><th>Case no.</th><th>Type</th><th>Subject</th><th>Risk</th><th>Received</th></tr>";
+      q.forEach(function (c) {
+        qHtml += "<tr><td class='nowrap'><a href='#' data-open-case='" + c.id + "'>" + esc(c.case_no) + "</a></td>" +
+          "<td>" + esc(capKind(c.kind)) + "</td>" +
+          "<td><span class='trunc'>" + esc(c.title) + "</span></td>" +
+          "<td><span class='risk " + esc(c.risk_level) + "'>" + esc(c.risk_level) + "</span> <span class='dim'>" + c.risk_score + "</span></td>" +
+          "<td class='nowrap dim'>" + esc(c.created_at) + "</td></tr>";
+      });
+      qHtml += "</table>";
+    }
+    document.getElementById("dash-citizen-queue").innerHTML = qHtml;
+
+    var heatHtml = "<tr><th>Identifier</th><th class='num'>Cases</th></tr>";
+    allEnts.slice(0, 7).forEach(function (e) {
+      heatHtml += "<tr><td><span class='dim'>" + esc(e.kind) + "</span><br><a class='mono' href='#' data-filter-id='" + esc(e.val) + "'>" + esc(e.val) + "</a></td>" +
+        "<td class='num'>" + e.cases + (e.high ? "<br><span class='dim bad-txt'>" + e.high + " high</span>" : "") + "</td></tr>";
+    });
+    document.getElementById("dash-heat-table").innerHTML = heatHtml;
+
+    var byKind = { message: 0, url: 0, website: 0, apk: 0 };
+    CASES.forEach(function (c) { if (byKind[c.kind] !== undefined) byKind[c.kind]++; });
+    document.getElementById("rec-msg").textContent = byKind.message;
+    document.getElementById("rec-url").textContent = byKind.url;
+    document.getElementById("rec-web").textContent = byKind.website;
+    document.getElementById("rec-apk").textContent = byKind.apk;
+    document.getElementById("rec-ents").textContent = allEnts.length;
+    document.getElementById("rec-bl").textContent = "2500";
+  }
+
+  function capKind(k) {
+    return ({ message: "Message", url: "URL", website: "Website", apk: "Android app" })[k] || k;
+  }
+
+  function statusLabel(s) {
+    return ({ open: "Open", investigating: "Under investigation", closed_fraud: "Confirmed fraud", closed_benign: "Closed (benign)" })[s] || s;
+  }
+
+  function collectAllIdentifiers() {
+    var map = {};
+    CASES.forEach(function (c) {
+      (c.iocs || []).forEach(function (i) {
+        var key = i.kind + "|" + i.val;
+        if (!map[key]) {
+          map[key] = { kind: i.kind, val: i.val, cases: 0, high: 0, caseNos: [], first: c.created_at, last: c.created_at };
+        }
+        map[key].cases += 1;
+        if (c.risk_level === "HIGH") map[key].high += 1;
+        map[key].caseNos.push(c.case_no);
+      });
+    });
+    var list = Object.keys(map).map(function (k) { return map[k]; });
+    list.sort(function (a, b) { return b.cases - a.cases || b.high - a.high; });
+    return list;
+  }
+
+  function renderCaseRegister() {
+    var q = (document.getElementById("cases-search").value || "").trim().toLowerCase();
+    var typeF = document.getElementById("cases-type").value;
+    var riskF = document.getElementById("cases-risk").value;
+    var statusF = document.getElementById("cases-status").value;
+
+    var filtered = CASES.filter(function (c) {
+      if (typeF && c.kind !== typeF) return false;
+      if (riskF && c.risk_level !== riskF) return false;
+      if (statusF && c.status !== statusF) return false;
+      if (q) {
+        var hay = (c.case_no + " " + c.title + " " + c.category + " " + c.raw).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+
+    document.getElementById("cases-count-sub").textContent = filtered.length + " records";
+    var html = "<tr><th>Case no.</th><th>Type</th><th>Subject</th><th>Category</th><th>Risk</th><th class='num'>Score</th><th>Status</th><th>Received</th></tr>";
+    if (!filtered.length) {
+      html += "<tr><td colspan='8' class='empty'>No cases match the current filters.</td></tr>";
+    } else {
+      filtered.forEach(function (c) {
+        html += "<tr>" +
+          "<td class='nowrap'><a href='#' data-open-case='" + c.id + "'>" + esc(c.case_no) + "</a></td>" +
+          "<td class='nowrap'>" + esc(capKind(c.kind)) + "</td>" +
+          "<td><span class='trunc'>" + esc(c.title) + "</span></td>" +
+          "<td>" + esc(c.category || "—") + "</td>" +
+          "<td><span class='risk " + esc(c.risk_level) + "'>" + esc(c.risk_level) + "</span></td>" +
+          "<td class='num'>" + c.risk_score + "</td>" +
+          "<td><span class='st " + esc(c.status) + "'>" + esc(statusLabel(c.status)) + "</span></td>" +
+          "<td class='nowrap dim'>" + esc(c.created_at) + "</td>" +
+          "</tr>";
+      });
+    }
+    document.getElementById("cases-table").innerHTML = html;
+  }
+
+  function renderIdentifiers() {
+    var q = (document.getElementById("id-search").value || "").trim().toLowerCase();
+    var kindF = document.getElementById("id-type").value;
+    var corrF = document.getElementById("id-corr").value;
+    var ents = collectAllIdentifiers().filter(function (e) {
+      if (kindF && e.kind !== kindF) return false;
+      if (corrF === "linked" && e.cases < 2) return false;
+      if (q && (e.val.toLowerCase().indexOf(q) === -1 && e.kind.toLowerCase().indexOf(q) === -1)) return false;
+      return true;
+    });
+    document.getElementById("id-count-sub").textContent = ents.length + " distinct identifiers indexed across all cases";
+    var html = "<tr><th>Type</th><th>Identifier</th><th class='num'>Linked cases</th><th>Case refs</th><th>Last seen</th><th></th></tr>";
+    ents.forEach(function (e) {
+      html += "<tr>" +
+        "<td class='nowrap'>" + esc(e.kind) + "</td>" +
+        "<td class='mono'>" + esc(e.val) + "</td>" +
+        "<td class='num'>" + e.cases + "</td>" +
+        "<td class='mono dim'>" + esc(e.caseNos.join(", ")) + "</td>" +
+        "<td class='nowrap dim'>" + esc(e.last) + "</td>" +
+        "<td><button class='btn plain small' type='button' data-copy='" + esc(e.val) + "'>copy</button></td>" +
+        "</tr>";
+    });
+    document.getElementById("id-table").innerHTML = html;
+  }
+
+  function renderHeatlist() {
+    var ents = collectAllIdentifiers();
+    function groupHtml(kinds) {
+      var list = ents.filter(function (e) { return kinds.indexOf(e.kind) !== -1; });
+      if (!list.length) return "<div class='empty'>No identifiers of this type reported in this window.</div>";
+      var max = list[0].cases || 1;
+      var h = "<table class='grid'><tr><th>#</th><th>Identifier</th><th class='num'>Cases</th><th class='num'>High risk</th></tr>";
+      list.forEach(function (e, idx) {
+        h += "<tr><td>" + (idx + 1) + "</td><td><progress class='heat' max='" + max + "' value='" + e.cases + "'></progress><span class='mono'>" + esc(e.val) + "</span></td>" +
+          "<td class='num'><b>" + e.cases + "</b></td><td class='num'>" + e.high + "</td></tr>";
+      });
+      h += "</table>";
+      return h;
+    }
+    document.getElementById("heat-domains").innerHTML = groupHtml(["Domain", "URL"]);
+    document.getElementById("heat-phones").innerHTML = groupHtml(["Phone"]);
+    document.getElementById("heat-upis").innerHTML = groupHtml(["UPI ID"]);
+    document.getElementById("heat-apks").innerHTML = groupHtml(["APK Package", "Cert SHA-256"]);
+    document.getElementById("heat-banks").innerHTML = groupHtml(["Bank A/C"]);
+    document.getElementById("heat-crypto").innerHTML = groupHtml(["Crypto Wallet"]);
+  }
+
+  function renderBlocklist() {
+    var q = (document.getElementById("bl-search").value || "").trim().toLowerCase();
+    var tf = document.getElementById("bl-type").value;
+    var items = BLOCKLIST.filter(function (b) {
+      if (tf && b.type !== tf) return false;
+      if (q && (b.value.toLowerCase().indexOf(q) === -1 && b.source.toLowerCase().indexOf(q) === -1)) return false;
+      return true;
+    });
+    var html = "<tr><th>Type</th><th>Value</th><th>Source</th><th>Note</th><th>Added</th><th></th></tr>";
+    items.forEach(function (b, idx) {
+      html += "<tr><td>" + esc(b.type) + "</td><td class='mono'>" + esc(b.value) + "</td><td>" + esc(b.source) + "</td>" +
+        "<td class='dim'>" + esc(b.note) + "</td><td class='nowrap dim'>" + esc(b.added) + "</td>" +
+        "<td><button class='btn danger small' type='button' data-del-bl='" + idx + "'>remove</button></td></tr>";
+    });
+    document.getElementById("bl-table").innerHTML = html;
+  }
+
+  function renderAudit() {
+    var q = (document.getElementById("audit-search").value || "").trim().toLowerCase();
+    var rows = AUDIT_LOG.filter(function (a) {
+      if (!q) return true;
+      return (a.user + " " + a.action + " " + a.target + " " + a.detail).toLowerCase().indexOf(q) !== -1;
+    });
+    var html = "<tr><th>Time</th><th>User</th><th>IP</th><th>Action</th><th>Target</th><th>Detail</th></tr>";
+    rows.forEach(function (a) {
+      html += "<tr><td class='nowrap dim'>" + esc(a.time) + "</td><td class='mono'>" + esc(a.user) + "</td><td class='mono dim'>" + esc(a.ip) + "</td>" +
+        "<td class='mono'>" + esc(a.action) + "</td><td class='mono'>" + esc(a.target) + "</td><td class='dim'>" + esc(a.detail) + "</td></tr>";
+    });
+    document.getElementById("audit-table").innerHTML = html;
+  }
+
+  function openCaseDossier(caseId) {
+    var c = CASES.filter(function (x) { return x.id === caseId; })[0] || CASES[0];
+    currentCaseId = c.id;
+
+    document.getElementById("cd-title-crumb").textContent = c.case_no + " — Case Dossier";
+    var vBox = document.getElementById("cd-verdict");
+    vBox.className = "verdict " + c.risk_level;
+    document.getElementById("cd-score-big").textContent = c.risk_score;
+    document.getElementById("cd-risk-label").textContent = c.risk_level + " RISK";
+    var prog = document.getElementById("cd-meter");
+    prog.value = c.risk_score;
+    document.getElementById("cd-case-title").textContent = c.title;
+    document.getElementById("cd-facts").innerHTML =
+      "<span>Case no: <b>" + esc(c.case_no) + "</b></span>" +
+      "<span>Type: <b>" + esc(capKind(c.kind)) + "</b></span>" +
+      (c.category ? "<span>Category: <b>" + esc(c.category) + "</b></span>" : "") +
+      "<span>SHA-256: <b class='mono'>" + esc(c.sha256.slice(0, 16)) + "...</b></span>";
+
+    var indHtml = "";
+    c.indicators.forEach(function (ind) {
+      var cls = ind.weight > 0 ? "pos" : "zero";
+      indHtml += "<tr class='" + cls + "'>" +
+        "<td class='w'>" + (ind.weight > 0 ? "+" + ind.weight : "0") + "</td>" +
+        "<td><div class='t'>" + esc(ind.title) + "</div><div class='d'>" + esc(ind.desc) + "</div>" +
+        (ind.ev ? "<div class='e'>" + esc(ind.ev) + "</div>" : "") + "</td>" +
+        "<td class='g'>" + esc(ind.group) + "</td></tr>";
+    });
+    document.getElementById("cd-ind-table").innerHTML = indHtml;
+
+    var iocHtml = "<tr><th>Type</th><th>Value</th><th>Detail</th><th class='num'>Cases</th></tr>";
+    c.iocs.forEach(function (i) {
+      iocHtml += "<tr><td class='nowrap'>" + esc(i.kind) + "</td><td class='mono'>" + esc(i.val) + "</td>" +
+        "<td class='dim'>" + esc(i.extra) + "</td><td class='num'><b>" + i.cases + "</b></td></tr>";
+    });
+    document.getElementById("cd-ioc-table").innerHTML = iocHtml;
+
+    var techHtml = "";
+    c.tech.forEach(function (kv) {
+      techHtml += "<tr><th>" + esc(kv[0]) + "</th><td class='mono'>" + esc(kv[1]) + "</td></tr>";
+    });
+    document.getElementById("cd-tech-kv").innerHTML = techHtml;
+    document.getElementById("cd-raw").textContent = c.raw;
+    document.getElementById("cd-notes-box").value = c.notes || "";
+    document.getElementById("cd-status-sel").value = c.status;
+
+    renderSvgGraph(c);
+    renderNoticePreview(c);
+    showView("case", "cases");
+  }
+
+  function renderSvgGraph(c) {
+    var linkedCases = CASES.filter(function (other) {
+      if (other.id === c.id) return false;
+      var myVals = (c.iocs || []).map(function (i) { return i.val; });
+      return (other.iocs || []).some(function (oi) { return myVals.indexOf(oi.val) !== -1; });
+    });
+
+    var svg = document.getElementById("cd-svg-graph");
+    if (!c.iocs.length) {
+      svg.innerHTML = "<text x='20' y='40' class='lc-sub'>No entities extracted for graph visualization.</text>";
+      return;
+    }
+
+    var h = 210;
+    svg.setAttribute("viewBox", "0 0 760 " + h);
+    var out = "";
+    out += "<text x='24' y='18' class='lc-col'>FOCAL CASE</text>";
+    out += "<text x='280' y='18' class='lc-col'>EXTRACTED IDENTIFIERS</text>";
+    out += "<text x='560' y='18' class='lc-col'>CORRELATED CASES</text>";
+
+    var topIocs = c.iocs.slice(0, 3);
+    topIocs.forEach(function (ioc, idx) {
+      var ey = 56 + idx * 54;
+      out += "<path d='M 185 102 C 230 102, 235 " + ey + ", 270 " + ey + "' class='lc-edge " + (c.risk_level === "HIGH" ? "high" : "linked") + "'/>";
+      out += "<rect x='270' y='" + (ey - 18) + "' width='225' height='36' class='lc-node ent'/>";
+      out += "<text x='280' y='" + (ey - 2) + "' class='lc-title'>" + esc(ioc.val.slice(0, 28)) + "</text>";
+      out += "<text x='280' y='" + (ey + 11) + "' class='lc-sub'>" + esc(ioc.kind) + " · " + ioc.cases + " case(s)</text>";
+
+      if (linkedCases[idx]) {
+        var lc = linkedCases[idx];
+        out += "<path d='M 495 " + ey + " C 525 " + ey + ", 525 " + ey + ", 555 " + ey + "' class='lc-edge linked'/>";
+        out += "<a href='#' data-open-case='" + lc.id + "'><rect x='555' y='" + (ey - 18) + "' width='185' height='36' class='lc-node case " + esc(lc.risk_level) + "'/>";
+        out += "<text x='565' y='" + (ey - 2) + "' class='lc-title'>" + esc(lc.case_no) + "</text>";
+        out += "<text x='565' y='" + (ey + 11) + "' class='lc-sub'>" + esc(lc.risk_level) + " · " + lc.risk_score + "/100</text></a>";
+      }
+    });
+
+    out += "<rect x='20' y='74' width='165' height='56' class='lc-node focal'/>";
+    out += "<text x='30' y='92' class='lc-kicker'>" + esc(c.risk_level) + " · " + c.risk_score + "/100</text>";
+    out += "<text x='30' y='108' class='lc-focal-val'>" + esc(c.case_no) + "</text>";
+    out += "<text x='30' y='122' class='lc-sub'>" + esc(capKind(c.kind)) + "</text>";
+    svg.innerHTML = out;
+  }
+
+  function renderNoticePreview(c) {
+    var iocLines = (c.iocs || []).map(function (i) {
+      return "- " + i.kind + ": " + i.val + (i.extra ? " (" + i.extra + ")" : "");
+    }).join("\n");
+    var html = "<h3>Notice Under Section 94 BNSS, 2023 (Corresponding to Section 91 CrPC)</h3>" +
+      "<p><b>Ref Case No:</b> " + esc(c.case_no) + " &nbsp;|&nbsp; <b>Unit:</b> State Cyber Crime Cell &nbsp;|&nbsp; <b>Date:</b> 22 Nov 2026</p>" +
+      "<p><b>To:</b> Nodal Officer — Concerned Bank / NPCI / Domain Registrar / Telecom Service Provider</p>" +
+      "<p>During technical and forensic investigation of cyber-fraud complaint <b>" + esc(c.case_no) + "</b> (Risk Assessment: <b>" + esc(c.risk_level) + " " + c.risk_score + "/100</b>), the following indicators of compromise (IOCs) were identified:</p>" +
+      "<pre class='raw'>" + esc(iocLines || "No IOCs extracted.") + "</pre>" +
+      "<p style='margin-top:10px;'>You are hereby requested under Section 94 of the Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023 to preserve all KYC, IP access logs, transaction trails, and beneficiary account details associated with the above identifiers and furnish a certified report at the earliest.</p>" +
+      "<p style='text-align:right; margin-top:18px;'><b>Inspector Sunil Yogi</b><br>State Cyber Crime Cell</p>";
+    document.getElementById("cd-notice-preview").innerHTML = html;
+  }
+
+  function scoreSubmittedInput(kind, payload) {
+    var text = ((payload.text || "") + " " + (payload.url || "") + " " + (payload.html || "") + " " + (payload.sender || "")).trim();
+    var lower = text.toLowerCase();
+    var score = 0;
+    var inds = [];
+    var iocs = [];
+
+    if (/onlinesbi\.sbi|github\.com|rbi\.org\.in|cybercrime\.gov\.in/.test(lower) && !/kyc|suspended|verify@/.test(lower)) {
+      inds.push({ code: "url.allowlist", group: "TRUST", weight: 0, title: "Verified official domain", desc: "Matches trusted allowlisted domain with no scam keywords detected.", ev: payload.url || text.slice(0, 60) });
+      return { risk_level: "LOW", risk_score: 0, category: "", inds: inds, iocs: [{ kind: "URL", val: payload.url || text.slice(0, 80), extra: "Official Portal", cases: 1 }] };
+    }
+
+    if (/\.(top|xyz|bet|cfd|buzz|tk|ml)\b/.test(lower)) {
+      score += 30;
+      inds.push({ code: "url.risky_tld", group: "DOMAIN", weight: 30, title: "High-risk / disposable TLD", desc: "URL uses a TLD disproportionately associated with throwaway phishing infrastructure.", ev: (lower.match(/[a-z0-9.-]+\.(top|xyz|bet|cfd|buzz|tk|ml)/) || [""])[0] });
+    }
+    if (/(sbi|hdfc|icici|axis|pan|kyc|aadhaar|uidai|cbi|police|epfo)/.test(lower) && !/onlinesbi\.sbi/.test(lower)) {
+      score += 30;
+      inds.push({ code: "content.brand_impersonation", group: "BRAND", weight: 30, title: "Protected bank or government impersonation", desc: "Mentions banking, KYC, or law-enforcement authority outside verified official domains.", ev: "Banking / KYC / Authority keyword match" });
+    }
+    if (/(suspend|block|urgent|today|digital arrest|bail|guaranteed|200%|double|color prediction|loan|instant cash)/.test(lower)) {
+      score += 25;
+      inds.push({ code: "content.fraud_lure", group: "CONTENT", weight: 25, title: "Urgency, coercion, or guaranteed-return lure", desc: "Contains coercive account-suspension, digital-arrest, fake loan, or Ponzi ROI language.", ev: text.slice(0, 90) });
+    }
+    if (kind === "apk" || /\.apk\b/.test(lower)) {
+      score += 35;
+      inds.push({ code: "apk.sideloaded", group: "APK", weight: 35, title: "Sideloaded Android APK binary / package", desc: "Direct APK distribution outside Google Play triggers static AXML, permission, and cert checks.", ev: payload.url || "Uploaded .apk" });
+    }
+
+    var upis = text.match(/[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}/g) || [];
+    upis.forEach(function (u) {
+      iocs.push({ kind: "UPI ID", val: u.toLowerCase(), extra: "Extracted payment handle", cases: 2 });
+      score += 10;
+    });
+    var phones = text.match(/(?:\+91[\s-]?)?[6-9]\d{9}/g) || [];
+    phones.forEach(function (p) {
+      iocs.push({ kind: "Phone", val: p.replace(/[\s-]/g, ""), extra: "Extracted phone number", cases: 1 });
+    });
+    var urls = text.match(/https?:\/\/[^\s]+/gi) || [];
+    urls.forEach(function (u) {
+      iocs.push({ kind: "URL", val: u, extra: "Extracted target URL", cases: 1 });
+      try {
+        var host = u.replace(/^https?:\/\//i, "").split("/")[0].split(":")[0];
+        iocs.push({ kind: "Domain", val: host, extra: "Extracted hostname", cases: 1 });
+      } catch (e) {}
+    });
+
+    if (score > 100) score = 100;
+    if (!inds.length) {
+      score = 12;
+      inds.push({ code: "scan.baseline", group: "CONTENT", weight: 12, title: "Low baseline risk indicators", desc: "No high-severity scam, phishing, Ponzi, or malware triggers found.", ev: text.slice(0, 80) });
+    }
+    var lvl = score >= 60 ? "HIGH" : (score >= 30 ? "MEDIUM" : "LOW");
+    var cat = /(bet|color prediction|guaranteed|200%|roi)/.test(lower) ? "Ponzi / Betting" : (/(loan|apk)/.test(lower) ? "Loan Fraud" : (lvl === "HIGH" ? "Phishing / Fraud" : ""));
+    return { risk_level: lvl, risk_score: score, category: cat, inds: inds, iocs: iocs };
+  }
+
+  function runOfficerAnalysis(e) {
+    e.preventDefault();
+    var webFileEl = document.getElementById("f-web-file");
+    var apkFileEl = document.getElementById("f-apk-file");
+    var webFileName = webFileEl && webFileEl.files && webFileEl.files[0] ? webFileEl.files[0].name : "";
+    var apkFileName = apkFileEl && apkFileEl.files && apkFileEl.files[0] ? apkFileEl.files[0].name : "";
+    var payload = {
+      channel: document.getElementById("f-channel").value,
+      sender: document.getElementById("f-sender").value,
+      text: document.getElementById("f-msg-text").value,
+      url: currentTab === "url" ? document.getElementById("f-url-input").value :
+           currentTab === "website" ? (document.getElementById("f-web-url").value || webFileName) :
+           currentTab === "apk" ? (document.getElementById("f-apk-url").value || apkFileName) : "",
+      html: currentTab === "website" ? document.getElementById("f-web-note").value : ""
+    };
+    var mainInput = currentTab === "message" ? payload.text : (payload.url || payload.html);
+    if (!mainInput.trim()) {
+      alert("Enter a message, URL, website/APK file, or click one of the PS01 presets first.");
+      return;
+    }
+
+    var res = scoreSubmittedInput(currentTab, payload);
+    var nextId = CASES.length + 1;
+    var caseNo = "NRK/2026/" + String(nextId).padStart(6, "0");
+    var newCase = {
+      id: nextId,
+      case_no: caseNo,
+      kind: currentTab,
+      source: "officer",
+      channel: capKind(currentTab),
+      sender: payload.sender,
+      title: mainInput.slice(0, 96),
+      category: res.category,
+      risk_level: res.risk_level,
+      risk_score: res.risk_score,
+      status: "investigating",
+      created_at: "22 Nov 2026, 04:50",
+      sha256: "e7b109c3a82d4f110099887766554433221100ffeeddccbbaa99887766554433",
+      raw: mainInput,
+      indicators: res.inds,
+      iocs: res.iocs,
+      tech: [
+        ["Submission Mode", capKind(currentTab)],
+        ["Live Probes", document.getElementById("f-live-check").checked ? "Enabled (RDAP, DNS, Redirects, TLS)" : "Offline Static Only"],
+        ["Assessed Risk", res.risk_level + " (" + res.risk_score + "/100)"]
+      ],
+      notes: ""
+    };
+    CASES.unshift(newCase);
+    AUDIT_LOG.unshift({
+      time: "22 Nov 2026 04:50:10",
+      user: "insp.sunil",
+      ip: "49.47.18.176",
+      action: "analyse",
+      target: caseNo,
+      detail: currentTab + ": " + mainInput.slice(0, 48) + " -> " + res.risk_level + " " + res.risk_score
+    });
+    refreshAll();
+    openCaseDossier(newCase.id);
+  }
+
+  function refreshAll() {
+    renderDashboard();
+    renderCaseRegister();
+    renderIdentifiers();
+    renderHeatlist();
+    renderBlocklist();
+    renderAudit();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    refreshAll();
+    setAnalyzeTab("message");
+    showView("dash", "dash");
+
+    document.body.addEventListener("click", function (ev) {
+      var navEl = ev.target.closest("[data-view]");
+      if (navEl) {
+        ev.preventDefault();
+        showView(navEl.getAttribute("data-view"), navEl.getAttribute("data-nav"));
+        return;
+      }
+      var tabEl = ev.target.closest("#analyze-tabs a[data-tab]");
+      if (tabEl) {
+        ev.preventDefault();
+        setAnalyzeTab(tabEl.getAttribute("data-tab"));
+        return;
+      }
+      var openCaseEl = ev.target.closest("[data-open-case]");
+      if (openCaseEl) {
+        ev.preventDefault();
+        openCaseDossier(parseInt(openCaseEl.getAttribute("data-open-case"), 10));
+        return;
+      }
+      var launchEl = ev.target.closest("[data-launch-tab]");
+      if (launchEl) {
+        ev.preventDefault();
+        setAnalyzeTab(launchEl.getAttribute("data-launch-tab"));
+        showView("analyze", "new");
+        return;
+      }
+      var presetEl = ev.target.closest("[data-preset]");
+      if (presetEl) {
+        ev.preventDefault();
+        var p = PRESETS[presetEl.getAttribute("data-preset")];
+        if (!p) return;
+        setAnalyzeTab(p.kind);
+        if (p.kind === "message") {
+          document.getElementById("f-channel").value = p.channel;
+          document.getElementById("f-sender").value = p.sender;
+          document.getElementById("f-msg-text").value = p.text;
+        } else if (p.kind === "url") {
+          document.getElementById("f-url-input").value = p.url;
+        } else if (p.kind === "website") {
+          document.getElementById("f-web-url").value = p.url;
+          document.getElementById("f-web-note").value = p.html || "";
+        } else if (p.kind === "apk") {
+          document.getElementById("f-apk-url").value = p.url;
+        }
+        return;
+      }
+      var copyEl = ev.target.closest("[data-copy]");
+      if (copyEl) {
+        var val = copyEl.getAttribute("data-copy");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(val);
+        }
+        copyEl.textContent = "copied";
+        setTimeout(function () { copyEl.textContent = "copy"; }, 1200);
+        return;
+      }
+      var filterIdEl = ev.target.closest("[data-filter-id]");
+      if (filterIdEl) {
+        ev.preventDefault();
+        document.getElementById("id-search").value = filterIdEl.getAttribute("data-filter-id");
+        renderIdentifiers();
+        showView("ids", "ids");
+        return;
+      }
+      var delBl = ev.target.closest("[data-del-bl]");
+      if (delBl) {
+        BLOCKLIST.splice(parseInt(delBl.getAttribute("data-del-bl"), 10), 1);
+        renderBlocklist();
+      }
+    });
+
+    document.getElementById("analyze-form").addEventListener("submit", runOfficerAnalysis);
+
+    document.getElementById("cases-filter-btn").addEventListener("click", renderCaseRegister);
+    document.getElementById("cases-reset-btn").addEventListener("click", function () {
+      document.getElementById("cases-search").value = "";
+      document.getElementById("cases-type").value = "";
+      document.getElementById("cases-risk").value = "";
+      document.getElementById("cases-status").value = "";
+      renderCaseRegister();
+    });
+    document.getElementById("id-filter-btn").addEventListener("click", renderIdentifiers);
+    document.getElementById("id-reset-btn").addEventListener("click", function () {
+      document.getElementById("id-search").value = "";
+      document.getElementById("id-type").value = "";
+      document.getElementById("id-corr").value = "";
+      renderIdentifiers();
+    });
+    document.getElementById("bl-filter-btn").addEventListener("click", renderBlocklist);
+    document.getElementById("bl-reset-btn").addEventListener("click", function () {
+      document.getElementById("bl-search").value = "";
+      document.getElementById("bl-type").value = "";
+      renderBlocklist();
+    });
+    document.getElementById("bl-add-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var v = document.getElementById("bl-new-val").value.trim();
+      if (!v) return;
+      BLOCKLIST.unshift({
+        type: document.getElementById("bl-new-type").value,
+        value: v,
+        source: "Officer manual entry",
+        note: document.getElementById("bl-new-note").value.trim(),
+        added: "22 Nov 2026, 04:50"
+      });
+      document.getElementById("bl-new-val").value = "";
+      document.getElementById("bl-new-note").value = "";
+      renderBlocklist();
+    });
+    document.getElementById("audit-filter-btn").addEventListener("click", renderAudit);
+    document.getElementById("audit-reset-btn").addEventListener("click", function () {
+      document.getElementById("audit-search").value = "";
+      renderAudit();
+    });
+
+    document.getElementById("cd-save-note").addEventListener("click", function () {
+      var c = CASES.filter(function (x) { return x.id === currentCaseId; })[0];
+      if (!c) return;
+      c.status = document.getElementById("cd-status-sel").value;
+      c.notes = document.getElementById("cd-notes-box").value;
+      refreshAll();
+      var msg = document.getElementById("cd-saved-msg");
+      msg.style.display = "block";
+      setTimeout(function () { msg.style.display = "none"; }, 2200);
+    });
+
+    document.getElementById("cd-toggle-notice").addEventListener("click", function () {
+      var el = document.getElementById("cd-notice-panel");
+      el.style.display = el.style.display === "none" ? "block" : "none";
+      if (el.style.display === "block") el.scrollIntoView({ behavior: "smooth" });
+    });
+
+    document.getElementById("export-csv-btn").addEventListener("click", function () {
+      var lines = ["case_no,type,title,risk_level,risk_score,status,received"];
+      CASES.forEach(function (c) {
+        lines.push([c.case_no, c.kind, '"' + c.title.replace(/"/g, '""') + '"', c.risk_level, c.risk_score, c.status, '"' + c.created_at + '"'].join(","));
+      });
+      var blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "nirikshak_cases.csv";
+      a.click();
+    });
+
+    document.getElementById("public-report-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var txt = document.getElementById("pub-input").value.trim();
+      if (!txt) return;
+      var res = scoreSubmittedInput("message", { text: txt, url: txt });
+      var out = document.getElementById("pub-result");
+      out.className = "warnbox " + res.risk_level;
+      out.style.display = "block";
+      out.innerHTML = "<h1>Assessment: " + esc(res.risk_level) + " RISK (" + res.risk_score + "/100)</h1>" +
+        "<p><b>Advice:</b> " + (res.risk_level === "HIGH" ? "Do NOT click this link, share OTP/PIN, or transfer money. Report immediately to Cyber Helpline 1930." : "No immediate high-risk fraud indicators detected; verify official sender before transacting.") + "</p>" +
+        "<p class='mini'>Citizen submission logged for Cyber Crime Cell triage.</p>";
+    });
+
+    document.getElementById("link-check-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var u = document.getElementById("lc-url-input").value.trim();
+      if (!u) return;
+      var res = scoreSubmittedInput("url", { url: u });
+      var box = document.getElementById("lc-result");
+      box.className = "warnbox " + res.risk_level;
+      box.style.display = "block";
+      box.innerHTML = "<h1>" + esc(res.risk_level) + " RISK (" + res.risk_score + "/100) — " + esc(u) + "</h1>" +
+        "<p>" + esc(res.inds[0].desc) + "</p>";
+    });
+
+    document.getElementById("login-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      showView("dash", "dash");
+    });
+
+    document.getElementById("users-create-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var u = document.getElementById("u-new-user").value.trim();
+      var fn = document.getElementById("u-new-name").value.trim();
+      if (!u || !fn) return;
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td class='mono'>" + esc(u) + "</td><td>" + esc(fn) + "</td><td class='mono'>" + esc(document.getElementById("u-new-badge").value) + "</td><td>" + esc(document.getElementById("u-new-unit").value) + "</td><td><span class='tag'>" + esc(document.getElementById("u-new-role").value) + "</span></td><td class='ok-txt'>active</td><td class='dim'>just now</td>";
+      document.getElementById("users-table").appendChild(tr);
+      document.getElementById("u-new-user").value = "";
+      document.getElementById("u-new-name").value = "";
+    });
+  });
+})();
+
+</script>
+</body>
+</html>

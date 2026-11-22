@@ -1,8 +1,11 @@
 # NIRIKSHAK
 
-**Cyber Fraud Analysis & Investigation Platform (PS01)**
+**Cyber Fraud Analysis & Investigation Platform (PS01 — Rajasthan Police Hackathon 2026)**
 
-NIRIKSHAK is a unified operational triage and digital investigation system built for cybercrime units and investigating officers. It ingests suspicious **SMS/WhatsApp/e-mail messages**, **URLs**, **fraudulent investment/Ponzi/betting websites & screenshots**, and **Android APK packages / app-store links**; produces transparent, weight-backed risk verdicts (`LOW` / `MEDIUM` / `HIGH`); extracts actionable financial and infrastructure identifiers; correlates shared indicators across cases; and exports investigation-ready PDF reports and Section 94 BNSS / Section 91 CrPC nodal action summaries.
+- **Live Deployment:** https://nirikshak-ten.vercel.app/
+- **Documentation & Deliverables:** [`docs/NIRIKSHAK_Presentation.pptx`](docs/NIRIKSHAK_Presentation.pptx) · [`docs/NIRIKSHAK_Wireframe.pdf`](docs/NIRIKSHAK_Wireframe.pdf) · [`docs/NIRIKSHAK_HTML_Prototype.html`](docs/NIRIKSHAK_HTML_Prototype.html)
+
+NIRIKSHAK is a unified operational triage and digital investigation system built for cybercrime units and investigating officers. It ingests suspicious **SMS/WhatsApp/e-mail messages**, **URLs**, **fraudulent investment/Ponzi/betting websites & screenshots**, and **Android APK packages / app-store links**; produces transparent, weight-backed risk verdicts (`LOW` / `MEDIUM` / `HIGH`) enriched with Groq AI forensic briefs & Vision OCR; extracts actionable financial and infrastructure identifiers; correlates shared indicators across cases; and exports investigation-ready PDF reports and Section 94 BNSS / Section 91 CrPC nodal action summaries.
 
 ---
 
@@ -42,10 +45,10 @@ Fraud campaigns regularly reuse the same mule UPI IDs, bank accounts, phone numb
           +---------------+------------+------------+---------------+---------------+
           |               |                         |               |               |
           v               v                         v               v               v
-     message.py       urlscan.py               website.py        apk.py         iocs.py /
-     Scam rules,      Brand impersonation,     HTML/MHTML/OCR    AXML/ARSC/     similarity.py /
-     SPF/DKIM/DMARC,  DNS, RDAP + WHOIS:43,    forms, JS flags,  DEX strings,   linkchart.py
-     sender checks    redirects, TLS, GSB      UPI/crypto        v1/v2/v3 certs
+     message.py       urlscan.py               website.py        apk.py         ai_intel.py
+     Scam rules,      Brand impersonation,     HTML/MHTML/OCR    AXML/ARSC/     Groq Forensic LLM,
+     SPF/DKIM/DMARC,  DNS, RDAP + WHOIS:43,    forms, JS flags,  DEX strings,   Vision OCR & BNS/
+     sender checks    redirects, TLS, GSB      UPI/crypto        v1/v2/v3 certs Officer Action Brief
                                        |
                                        v
              Supabase PostgreSQL + Private Storage (nk-evidence) + Local Evidence Cache
@@ -96,6 +99,11 @@ Normalises and extracts identifiers into `nk_entities` for cross-case correlatio
 - **Payment:** UPI VPAs & `upi://pay` links (attributed to NPCI PSP sponsor banks), bank account numbers, RBI IFSC codes (mapped to bank names), and checksum-validated crypto wallets (TRON USDT TRC-20, EVM/ETH/BSC, Bitcoin legacy & bech32).
 - **Telecom & Messaging:** Indian mobile numbers (`+91`), toll-free numbers, Telegram handles/channels, WhatsApp click-to-chat numbers & group invites, and e-mail addresses.
 - **Infrastructure & Apps:** URLs, registrable/full domains, IPv4 addresses, Android package names, APK SHA-256 digests, and signing certificate SHA-256 fingerprints.
+
+### 6. AI Forensic Intelligence & Multimodal Vision OCR (`app/analysis/ai_intel.py`)
+- **Groq Vision OCR (`qwen/qwen3.8-27b`):** Automatically transcribes text verbatim (URLs, UPI IDs, phone numbers, bank details, Hindi/Hinglish text, and brand cues) from uploaded scam/website screenshots on serverless hosts with local Tesseract/WinRT and Cloud OCR fallbacks.
+- **Groq Forensic Brief (`openai/gpt-oss-120b`):** Generates an understated officer dossier panel (**Modus operandi**, **Observed tactics**, prima facie **IT Act 2000 & BNS / BNSS 2023** provisions, and concrete **Officer action plan**) embedded into both the web console and downloadable PDF reports.
+- **Official Allowlist Guardrail:** Enforces zero false-positive risk deltas or criminal provisions against verified institutional domains (including RBI-mandated `.sbi` / `.bank.in` portals).
 
 ---
 
@@ -156,6 +164,7 @@ Normalises and extracts identifiers into `nk_entities` for cross-case correlatio
 .
 ├── app/
 │   ├── analysis/
+│   │   ├── ai_intel.py     # Groq AI forensic triage & multimodal Vision OCR
 │   │   ├── apk.py          # AXML, ARSC, DEX strings, v1/v2/v3 certs, store links
 │   │   ├── brands.py       # Impersonation reference domains/packages, free hosts, shorteners
 │   │   ├── iocs.py         # IOC extraction & UPI PSP / RBI IFSC / crypto attribution
@@ -178,15 +187,21 @@ Normalises and extracts identifiers into `nk_entities` for cross-case correlatio
 │   ├── notice.py           # Section 94 BNSS / Section 91 CrPC nodal notice generator
 │   ├── report.py           # ReportLab PDF report builder
 │   └── service.py          # Analysis orchestration, correlation & persistence
+├── docs/
+│   ├── NIRIKSHAK_Presentation.pptx
+│   ├── NIRIKSHAK_Wireframe.pdf
+│   └── NIRIKSHAK_HTML_Prototype.html
 ├── extension/              # Chrome MV3 extension ("Inspect link with NIRIKSHAK")
-├── samples/                # Inert synthetic test APKs generated by tools/make_test_apk.py
+├── samples/                # Inert synthetic test APKs & demo fraud samples
 ├── supabase/schema.sql     # PostgreSQL tables, indexes, RLS & RPC functions
 ├── tools/
-│   ├── make_test_apk.py    # Generates inert synthetic APKs for offline testing
-│   └── telegram_bot.py     # Citizen Telegram reporting bot
+│   ├── make_demo_samples.py # Generates synthetic PS01 phishing/Ponzi/betting samples
+│   ├── make_test_apk.py     # Generates inert synthetic APKs for offline testing
+│   └── telegram_bot.py      # Citizen Telegram reporting bot
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
+├── vercel.json
 └── run.py
 ```
 
@@ -224,6 +239,10 @@ docker compose up --build   # listens on 127.0.0.1:8000
 | `NK_MAX_APK_MB` | No | `150` | Maximum APK upload size in MB for officers |
 | `GOOGLE_SAFE_BROWSING_KEY` | No | — | Enables Google Safe Browsing v4 URL lookups |
 | `TELEGRAM_BOT_TOKEN` | No | — | Bot token for `python tools/telegram_bot.py` |
+| `OCR_SPACE_API_KEY` | No | — | Optional OCR.space fallback key for serverless screenshot OCR |
+| `GROQ_API_KEY` | No | — | Enables Groq AI forensic brief (`openai/gpt-oss-120b`) & Vision OCR (`qwen/qwen3.8-27b`) |
+| `NK_GROQ_MODEL` | No | `openai/gpt-oss-120b` | Primary Groq reasoning model ID |
+| `NK_GROQ_VISION_MODEL` | No | `qwen/qwen3.8-27b` | Groq multimodal Vision OCR model ID |
 
 ---
 
