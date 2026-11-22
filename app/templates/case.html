@@ -43,6 +43,23 @@
     <div class="body tight">{% if r.indicators %}{{ indicators(r.indicators) }}{% else %}<div class="empty">No indicators.</div>{% endif %}</div>
   </section>
 
+  {% if d.ai %}
+  <section class="panel">
+    <header><h2>AI forensic brief</h2><span class="aside">{{ d.ai.provider }} · <span class="mono">{{ d.ai.model }}</span></span></header>
+    <div class="body">
+      <table class="kv">
+        {% if d.ai.threat_category %}<tr><th>Classification</th><td><b>{{ d.ai.threat_category }}</b></td></tr>{% endif %}
+        <tr><th>Modus operandi</th><td>{{ d.ai.modus_operandi }}</td></tr>
+        {% if d.ai.tactics %}<tr><th>Observed tactics</th><td>{% for t in d.ai.tactics %}<span class="tag">{{ t }}</span> {% endfor %}</td></tr>{% endif %}
+        {% if d.ai.legal_provisions %}<tr><th>Prima facie provisions</th><td class="mono mini">{{ d.ai.legal_provisions|join(' · ') }}</td></tr>{% endif %}
+        {% if d.ai.officer_actions %}
+        <tr><th>Officer action plan</th><td><ol class="steps">{% for act in d.ai.officer_actions %}<li>{{ act }}</li>{% endfor %}</ol></td></tr>
+        {% endif %}
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="panel">
     <header><h2>Extracted identifiers</h2><span class="aside">{{ entities|length }} linked to the intelligence index</span></header>
     <div class="body tight">
@@ -258,6 +275,7 @@
     <div class="body mini">
       Analysed {{ r.engine.analysed_at|ist('%d %b %Y %H:%M:%S') if r.engine }}<br>
       Live checks: {{ 'on' if r.engine and r.engine.live_checks else 'off' }} · Safe Browsing: {{ 'on' if r.engine and r.engine.gsb else 'not configured' }}<br>
+      AI triage: {{ r.engine.groq_model if r.engine and r.engine.groq_ai else 'off' }}<br>
       Input SHA-256: <span class="mono">{{ c.content_sha256 }}</span>
     </div>
   </section>

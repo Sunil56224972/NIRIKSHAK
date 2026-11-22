@@ -57,6 +57,10 @@ GSB_API_KEY = os.getenv("GOOGLE_SAFE_BROWSING_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 OCR_SPACE_API_KEY = os.getenv("OCR_SPACE_API_KEY", "").strip()
 CLOUD_OCR = os.getenv("NK_CLOUD_OCR", "1" if IS_SERVERLESS else "0") == "1"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("NK_GROQ_MODEL", "openai/gpt-oss-120b").strip() or "openai/gpt-oss-120b"
+GROQ_VISION_MODEL = os.getenv("NK_GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip() or "qwen/qwen3.8-27b"
+GROQ_ENABLED = bool(GROQ_API_KEY) and os.getenv("NK_GROQ_ENABLED", "1") == "1"
 
 
 def _load_secret() -> str:

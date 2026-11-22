@@ -193,6 +193,13 @@ def _ocr(data: bytes, *, allow_cloud: bool = True) -> str | None:
                     pass
 
     if allow_cloud:
+        try:
+            from . import ai_intel
+            vision_txt = ai_intel.vision_ocr(data)
+            if vision_txt and vision_txt.strip():
+                return vision_txt.strip()
+        except Exception:
+            pass
         cloud = _cloud_ocr(data)
         if cloud is not None:
             return cloud

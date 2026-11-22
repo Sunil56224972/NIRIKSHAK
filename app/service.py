@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 
 from . import config
+from .analysis import ai_intel
 from .analysis import apk as apk_mod
 from .analysis import iocs as ioc_mod
 from .analysis import message as msg_mod
@@ -18,6 +19,24 @@ from .analysis.scoring import Findings
 from .db import DBError, Supabase, in_list
 
 KIND_LABEL = {"message": "Message", "url": "URL", "website": "Website", "apk": "Android app"}
+
+
+def _apply_ai(kind: str, result: dict, *, text_hint: str, run_live: bool) -> dict:
+    if not (run_live and config.GROQ_ENABLED):
+        return result
+    ai = ai_intel.analyze_forensics(
+        kind,
+        text=text_hint,
+        findings=result["findings"],
+        details=result.get("details", {}),
+        iocs=result.get("iocs", []),
+        category=result.get("category") or "",
+    )
+    if ai:
+        result.setdefault("details", {})["ai"] = ai
+        if not result.get("category") and ai.get("threat_category") and result["findings"].score >= 30:
+            result["category"] = ai["threat_category"]
+    return result
 
 
 # ----------------------------------------------------------------------------- analysis
@@ -32,7 +51,7 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
                         "email_headers": r["email_headers"], "links": r["links"]}
         r["fingerprint_text"] = r["body"]
         r["evidence"] = [("Original message text", "message.txt", text.encode("utf-8"), "text/plain; charset=utf-8")]
-        return r
+        return _apply_ai(kind, r, text_hint=text, run_live=run_live)
     if kind == "url":
         if not url.strip():
             raise ValueError("Enter a URL.")
@@ -40,7 +59,7 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
             r = apk_mod.analyze_store_link(url, run_live=run_live)
             r["details"] = {"store": r["meta"]}
             r["evidence"] = []
-            return r
+            return _apply_ai("apk", r, text_hint=url, run_live=run_live)
         rep = urlscan.analyze(url, run_live=run_live)
         found = ioc_mod.extract(rep["url"], "submitted URL")
         if rep["net"].get("final_url"):
@@ -51,14 +70,16 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
                           "context": f"hosting · {hosting.get('org', '')} {hosting.get('country', '')}".strip()})
         body = rep["net"].pop("_body", b"")
         ev = [("Landing page snapshot (HTML)", "landing.html", body, "text/html")] if body else []
-        return {"findings": rep["findings"], "iocs": found, "category": _url_category(rep["findings"]),
-                "details": {"url": rep["url"], "info": rep["info"], "net": rep["net"]}, "evidence": ev}
+        r = {"findings": rep["findings"], "iocs": found, "category": _url_category(rep["findings"]),
+             "details": {"url": rep["url"], "info": rep["info"], "net": rep["net"]}, "evidence": ev}
+        return _apply_ai(kind, r, text_hint=url, run_live=run_live)
     if kind == "website":
         r = web_mod.analyze(url=url.strip() or None, upload=upload, run_live=run_live)
         r["details"] = {k: v for k, v in r.items() if k in ("source", "url_report", "page", "original_url", "fetch_note")}
         r["fingerprint_text"] = r.get("page", {}).get("excerpt", "")
         r["evidence"] = r.pop("_evidence", [])
-        return r
+        hint = url.strip() or r["fingerprint_text"] or (upload[0] if upload else "")
+        return _apply_ai(kind, r, text_hint=hint, run_live=run_live)
     if kind == "apk":
         if upload:
             name, data = upload
@@ -67,12 +88,12 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
             r = apk_mod.analyze_apk(name, data)
             r["details"] = {"apk": r["meta"]}
             r["evidence"] = [("Submitted APK", name, data, "application/vnd.android.package-archive")]
-            return r
+            return _apply_ai(kind, r, text_hint=name, run_live=run_live)
         if url.strip():
             r = apk_mod.analyze_store_link(url.strip(), run_live=run_live)
             r["details"] = {"store": r["meta"]}
             r["evidence"] = []
-            return r
+            return _apply_ai(kind, r, text_hint=url, run_live=run_live)
         raise ValueError("Upload an APK file or enter an app-store link.")
     raise ValueError("Unknown analysis type")
 
@@ -323,6 +344,8 @@ def create_case(db: Supabase, kind: str, result: dict, *, input_text: str, sourc
         "indicators": f.to_list(), "details": result.get("details", {}),
         "intel": intel, "identifiers": items,
         "engine": {"live_checks": config.LIVE_CHECKS, "gsb": bool(config.GSB_API_KEY),
+                   "groq_ai": bool(result.get("details", {}).get("ai")),
+                   "groq_model": (result.get("details", {}).get("ai") or {}).get("model", ""),
                    "analysed_at": datetime.now(timezone.utc).isoformat()},
     }
     payload = json.loads(json.dumps(payload, default=str))

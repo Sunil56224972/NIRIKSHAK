@@ -222,6 +222,20 @@ def _technical(case: dict) -> list[tuple[str, str]]:
     if d.get("sender", {}).get("value"):
         s = d["sender"]
         out.append(("Sender", f"{s['value']}  ({s.get('type', 'unclassified')})"))
+    if d.get("ai"):
+        ai = d["ai"]
+        ai_lines = [f"model: {ai.get('provider', 'Groq')} {ai.get('model', '')}"]
+        if ai.get("threat_category"):
+            ai_lines.append(f"classification: {ai['threat_category']}")
+        if ai.get("modus_operandi"):
+            ai_lines.append(f"modus operandi: {ai['modus_operandi']}")
+        if ai.get("tactics"):
+            ai_lines.append("tactics: " + "; ".join(ai["tactics"]))
+        if ai.get("legal_provisions"):
+            ai_lines.append("provisions: " + "; ".join(ai["legal_provisions"]))
+        if ai.get("officer_actions"):
+            ai_lines.append("recommended actions:\n  - " + "\n  - ".join(ai["officer_actions"]))
+        out.append(("AI forensic brief", "\n".join(ai_lines)))
     for l in d.get("links", []):
         out.append((f"Embedded link — {l['level']} ({l['score']})", l["url"] + "\n" + "\n".join(
             f"{i['weight']:+d} {i['title']}" for i in l["findings"])))
