@@ -48,8 +48,8 @@
         <input type="text" name="url" value="{{ form.url }}" placeholder="https://play.google.com/store/apps/details?id=…"></div>
     {% endif %}
     <div class="field"><label class="check"><input type="checkbox" name="live" value="1" checked>
-      Run live checks (DNS, registration date, redirects, TLS, page / store fetch)</label>
-      <div class="hint">Untick on an isolated terminal. Fetches go out from this server, never from your browser.</div></div>
+      Run live checks (DNS, registration date, redirects, TLS, page / store fetch{% if GROQ_ENABLED %}, Groq AI brief{% endif %})</label>
+      <div class="hint">Untick on an isolated terminal. Fetches go out from this server, never from your browser.{% if GROQ_ENABLED %} Groq AI (<span class="mono">{{ GROQ_MODEL }}</span>) &amp; Vision OCR (<span class="mono">{{ GROQ_VISION_MODEL }}</span>) active.{% endif %}</div></div>
     <div class="actions"><button class="btn" type="submit">Analyse and open case</button></div>
   </form>
   </div>
@@ -72,6 +72,8 @@
     <p>Manifest: package, version, SDK levels, permissions, components, SMS/boot receivers, launcher visibility. Signing certificates (v1/v2/v3) with fingerprints.</p>
     <p>Code strings: embedded URLs/IPs/UPI IDs, SMS and accessibility API use, Telegram-bot exfiltration, dynamic code loading, packers. Brand impersonation and icon re-use against earlier apps.</p>
   {% endif %}
+  <hr>
+  <p><b>Groq AI forensic layer:</b> {% if GROQ_ENABLED %}Active (<span class="mono">{{ GROQ_MODEL }}</span>) — generates modus operandi, BNS / IT Act provisions, officer action plans, and Vision OCR (<span class="mono">{{ GROQ_VISION_MODEL }}</span>) for screenshots.{% else %}Set <code>GROQ_API_KEY</code> in environment to enable AI forensic triage &amp; Vision OCR.{% endif %}</p>
   </div>
 </aside>
 </div>

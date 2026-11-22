@@ -43,10 +43,13 @@
     <div class="body tight">{% if r.indicators %}{{ indicators(r.indicators) }}{% else %}<div class="empty">No indicators.</div>{% endif %}</div>
   </section>
 
-  {% if d.ai %}
-  <section class="panel">
-    <header><h2>AI forensic brief</h2><span class="aside">{{ d.ai.provider }} · <span class="mono">{{ d.ai.model }}</span></span></header>
+  <section class="panel" id="ai-panel">
+    <header>
+      <h2>AI forensic brief</h2>
+      <span class="aside">{% if d.ai %}{{ d.ai.provider }} · <span class="mono">{{ d.ai.model }}</span>{% elif GROQ_ENABLED %}Groq ready · <span class="mono">{{ GROQ_MODEL }}</span>{% else %}not configured{% endif %}</span>
+    </header>
     <div class="body">
+      {% if d.ai %}
       <table class="kv">
         {% if d.ai.threat_category %}<tr><th>Classification</th><td><b>{{ d.ai.threat_category }}</b></td></tr>{% endif %}
         <tr><th>Modus operandi</th><td>{{ d.ai.modus_operandi }}</td></tr>
@@ -56,9 +59,37 @@
         <tr><th>Officer action plan</th><td><ol class="steps">{% for act in d.ai.officer_actions %}<li>{{ act }}</li>{% endfor %}</ol></td></tr>
         {% endif %}
       </table>
+      {% endif %}
+      {% if GROQ_ENABLED %}
+      <div class="actions{% if d.ai %} after{% endif %}">
+        <form method="post" action="/cases/{{ c.id }}/ai-brief" class="inline" data-busy="Generating AI brief…">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn{{ ' plain small' if d.ai else '' }}">{{ 'Refresh AI brief' if d.ai else 'Generate AI forensic brief' }}</button>
+        </form>
+        {% if not d.ai %}<span class="mini">Analyses this dossier using Groq (<span class="mono">{{ GROQ_MODEL }}</span>) to produce modus operandi, BNS/IT Act sections &amp; next steps.</span>{% endif %}
+      </div>
+      <hr>
+      <form method="post" action="/cases/{{ c.id }}/ai-ask" data-busy="Querying Groq AI…">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field">
+          <label>Ask AI investigator about this case</label>
+          <div class="row">
+            <div class="field"><input type="text" name="question" required placeholder="e.g. Draft a Section 94 BNSS bank preservation request or summarise for FIR"></div>
+            <div><button type="submit" class="btn plain">Ask Groq AI</button></div>
+          </div>
+        </div>
+      </form>
+      {% for qa in d.ai_qa or [] %}
+      <div class="note info">
+        <div><b>Q:</b> {{ qa.question }}</div>
+        <div class="after"><b>A ({{ qa.model }}):</b> {{ qa.answer }}</div>
+      </div>
+      {% endfor %}
+      {% elif not d.ai %}
+      <div class="mini">Configure <code>GROQ_API_KEY</code> in environment variables to enable AI forensic briefs and interactive Q&amp;A.</div>
+      {% endif %}
     </div>
   </section>
-  {% endif %}
 
   <section class="panel">
     <header><h2>Extracted identifiers</h2><span class="aside">{{ entities|length }} linked to the intelligence index</span></header>

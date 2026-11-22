@@ -18,10 +18,17 @@
   {% endif %}
 </div>
 
-<section class="panel">
+<section class="panel gap">
   <header><h2>Reasons for this result</h2><span class="aside">Reference {{ case.case_no }}</span></header>
   <div class="body tight">{{ indicators(findings) }}</div>
 </section>
+
+{% if case.result.details and case.result.details.ai %}
+<section class="panel">
+  <header><h2>AI assessment note</h2><span class="aside">{{ case.result.details.ai.provider }}</span></header>
+  <div class="body"><p>{{ case.result.details.ai.modus_operandi }}</p></div>
+</section>
+{% endif %}
 
 <p class="after"><a class="btn plain" href="/report">Submit another item</a> <a class="btn plain" href="/check">Check a link</a></p>
 {% endblock %}

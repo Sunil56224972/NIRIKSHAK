@@ -46,9 +46,16 @@
   {% endif %}
 </div>
 
-<section class="panel">
+<section class="panel gap">
   <header><h2>Indicators</h2></header>
   <div class="body tight">{{ indicators(findings) }}</div>
 </section>
+
+{% if info.details and info.details.ai %}
+<section class="panel">
+  <header><h2>AI forensic summary</h2><span class="aside">{{ info.details.ai.provider }} · <span class="mono">{{ info.details.ai.model }}</span></span></header>
+  <div class="body"><p>{{ info.details.ai.modus_operandi }}</p></div>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

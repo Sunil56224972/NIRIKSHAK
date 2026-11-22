@@ -95,6 +95,7 @@
           <tr><th>Android apps</th><td>{{ stats.by_kind.apk or 0 }}</td></tr>
           <tr><th>Unique identifiers</th><td>{{ stats.entities or 0 }}</td></tr>
           <tr><th>Blocklist entries</th><td>{{ stats.blocklist or 0 }}</td></tr>
+          <tr><th>AI triage (Groq)</th><td>{% if GROQ_ENABLED %}<span class="ok-txt mono">{{ GROQ_MODEL }}</span>{% else %}<span class="dim">not configured</span>{% endif %}</td></tr>
         </table>
       </div>
     </section>

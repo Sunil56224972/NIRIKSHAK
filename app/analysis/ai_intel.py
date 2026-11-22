@@ -346,3 +346,91 @@ def analyze_forensics(
         "officer_actions": officer_actions,
         "risk_delta": risk_delta,
     }
+
+
+def ask_case_question(case: dict[str, Any], question: str) -> dict[str, Any] | None:
+    """Answer an investigating officer's follow-up question grounded in a case dossier."""
+    q_clean = (question or "").strip()[:500]
+    if not q_clean or not config.GROQ_ENABLED:
+        return None
+
+    res = case.get("result") or {}
+    det = res.get("details") or {}
+    ai_brief = det.get("ai") or {}
+    indicators_brief = [
+        {"title": i.get("title"), "detail": i.get("detail"), "weight": i.get("weight")}
+        for i in (res.get("indicators") or [])[:12]
+    ]
+    iocs_brief = [
+        {"type": it.get("etype"), "value": it.get("display"), "context": it.get("context", "")}
+        for it in (res.get("identifiers") or [])[:18]
+    ]
+
+    context_payload = {
+        "case_no": case.get("case_no"),
+        "kind": case.get("kind"),
+        "title": case.get("title"),
+        "category": case.get("category"),
+        "risk_level": case.get("risk_level"),
+        "risk_score": case.get("risk_score"),
+        "submitted_input": (case.get("input_text") or "")[:2000],
+        "indicators": indicators_brief,
+        "extracted_iocs": iocs_brief,
+        "existing_ai_brief": ai_brief,
+        "apk_summary": {
+            k: (det.get("apk") or {}).get(k)
+            for k in ("package", "label", "version_name", "risky_permissions", "api_markers")
+            if det.get("apk")
+        },
+        "network_summary": (det.get("net") or (det.get("url_report") or {}).get("net") or {}),
+    }
+
+    system_prompt = (
+        "You are an expert Cyber Crime Investigation Assistant helping an Indian Cyber Crime Cell officer. "
+        "Answer the officer's question concisely and practically based strictly on the provided case evidence JSON. "
+        "Do not fabricate facts, IPs, names, or statutes not supported by the case evidence. "
+        "When drafting FIR paragraphs or Section 94 BNSS / Section 91 CrPC requests, reference only the actual extracted IOCs and observed behaviours."
+    )
+
+    models: list[str] = []
+    for m in (config.GROQ_MODEL, "qwen/qwen3.8-27b", "openai/gpt-oss-20b"):
+        if m and m not in models:
+            models.append(m)
+
+    for model in models:
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Case Evidence:\n{json.dumps(context_payload, ensure_ascii=False, default=str)[:7000]}\n\n"
+                        f"Officer Question: {q_clean}"
+                    ),
+                },
+            ],
+            "temperature": 0.0,
+            "max_completion_tokens": 1100,
+        }
+        if "gpt-oss" in model:
+            body["reasoning_effort"] = "low"
+        try:
+            r = requests.post(GROQ_CHAT_URL, headers=_headers(), json=body, timeout=_timeout())
+            if not r.ok:
+                continue
+            ans = (
+                ((r.json().get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+            ).strip()
+            if ans:
+                from datetime import datetime, timezone
+
+                return {
+                    "question": q_clean,
+                    "answer": ans[:2500],
+                    "model": model,
+                    "at": datetime.now(timezone.utc).isoformat(),
+                }
+        except Exception:
+            continue
+    return None

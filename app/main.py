@@ -26,9 +26,9 @@ if _ROOT_DIR not in sys.path:
     sys.path.insert(0, _ROOT_DIR)
 
 from app import auth, config, feeds, notice, report, service
-from app.analysis import linkchart
+from app.analysis import ai_intel, linkchart
 from app.analysis.iocs import ETYPE_LABELS
-from app.analysis.scoring import Findings
+from app.analysis.scoring import Findings, Indicator
 from app.db import DBError, get_db, ilike_term, in_list
 
 app = FastAPI(title="NIRIKSHAK", docs_url=None, redoc_url=None, openapi_url=None)
@@ -57,7 +57,9 @@ templates.env.filters["kind"] = lambda k: KIND_LABEL.get(k, k)
 templates.env.filters["urlq"] = lambda s: quote(str(s), safe="")
 templates.env.filters["tojson_pretty"] = lambda v: json.dumps(v, indent=2, ensure_ascii=False, default=str)
 templates.env.globals.update(APP_NAME=config.APP_NAME, UNIT_NAME=config.UNIT_NAME, STATUS_LABEL=STATUS_LABEL,
-                             KIND_LABEL=KIND_LABEL, ETYPE_LABELS=ETYPE_LABELS)
+                             KIND_LABEL=KIND_LABEL, ETYPE_LABELS=ETYPE_LABELS,
+                             GROQ_ENABLED=config.GROQ_ENABLED, GROQ_MODEL=config.GROQ_MODEL,
+                             GROQ_VISION_MODEL=config.GROQ_VISION_MODEL)
 
 
 def _is_https(request: Request) -> bool:
@@ -621,6 +623,70 @@ def case_status(request: Request, case_id: int, status: str = Form(...), notes: 
     return RedirectResponse(f"/cases/{case_id}", 303)
 
 
+@app.post("/cases/{case_id}/ai-brief")
+def case_ai_brief(request: Request, case_id: int, csrf_token: str = Form("")):
+    check_csrf(request, csrf_token)
+    officer(request)
+    db = get_db()
+    c = _load_case(case_id)
+    if not config.GROQ_ENABLED:
+        return RedirectResponse(f"/cases/{case_id}#ai-panel", 303)
+
+    res = dict(c.get("result") or {})
+    f = Findings()
+    for it in res.get("indicators") or []:
+        f.items.append(Indicator(
+            it.get("code", "rule"),
+            it.get("title", ""),
+            it.get("detail", ""),
+            int(it.get("weight") or 0),
+            it.get("group", "content"),
+            it.get("evidence", ""),
+        ))
+    ai = ai_intel.analyze_forensics(
+        c["kind"],
+        text=c.get("input_text") or c.get("title") or "",
+        findings=f,
+        details=res.get("details") or {},
+        iocs=res.get("identifiers") or [],
+        category=c.get("category") or "",
+    )
+    if ai:
+        det = dict(res.get("details") or {})
+        det["ai"] = ai
+        res["details"] = det
+        eng = dict(res.get("engine") or {})
+        eng["groq_ai"] = True
+        eng["groq_model"] = ai.get("model", "")
+        res["engine"] = eng
+        upd = {"result": res, "updated_at": auth.now_iso()}
+        if not c.get("category") and ai.get("threat_category") and c.get("risk_score", 0) >= 30:
+            upd["category"] = ai["threat_category"]
+        db.update("nk_cases", {"id": f"eq.{case_id}"}, upd)
+        auth.audit(request, "ai_brief", c["case_no"], ai.get("model", "Groq"))
+    return RedirectResponse(f"/cases/{case_id}#ai-panel", 303)
+
+
+@app.post("/cases/{case_id}/ai-ask")
+def case_ai_ask(request: Request, case_id: int, question: str = Form(...), csrf_token: str = Form("")):
+    check_csrf(request, csrf_token)
+    officer(request)
+    db = get_db()
+    c = _load_case(case_id)
+    if config.GROQ_ENABLED and question.strip():
+        qa = ai_intel.ask_case_question(c, question)
+        if qa:
+            res = dict(c.get("result") or {})
+            det = dict(res.get("details") or {})
+            hist = list(det.get("ai_qa") or [])
+            hist.insert(0, qa)
+            det["ai_qa"] = hist[:10]
+            res["details"] = det
+            db.update("nk_cases", {"id": f"eq.{case_id}"}, {"result": res, "updated_at": auth.now_iso()})
+            auth.audit(request, "ai_ask", c["case_no"], question.strip()[:160])
+    return RedirectResponse(f"/cases/{case_id}#ai-panel", 303)
+
+
 @app.get("/cases/{case_id}/report.pdf")
 def case_pdf(request: Request, case_id: int):
     u = officer(request)
@@ -1027,6 +1093,12 @@ def api_check(request: Request, u: str = ""):
 def health():
     try:
         get_db().ping()
-        return {"status": "ok", "database": "ok", "live_checks": config.LIVE_CHECKS}
+        return {
+            "status": "ok",
+            "database": "ok",
+            "live_checks": config.LIVE_CHECKS,
+            "groq_ai": config.GROQ_ENABLED,
+            "groq_model": config.GROQ_MODEL if config.GROQ_ENABLED else "",
+        }
     except DBError as exc:
         return JSONResponse({"status": "degraded", "database": str(exc)}, 503)
