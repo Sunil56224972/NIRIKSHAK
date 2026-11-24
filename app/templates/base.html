@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ UNIT_NAME }}</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="{% if public %}public{% endif %}">
 <div class="mast">
   <div class="mast-in">
-    <a class="brand" href="{{ '/report' if public else '/' }}"><b>{{ APP_NAME }}</b><span>Cyber Fraud Analysis System</span></a>
+    <a class="brand" href="{{ '/report' if public else '/' }}"><img class="brand-mark" src="/static/logo-mast.png" width="24" height="24" alt=""><b>{{ APP_NAME }}</b><span>Cyber Fraud Analysis System</span></a>
     {% if user and not public %}
     <nav>
       <a href="/" class="{{ 'on' if nav == 'dash' }}">Dashboard</a>

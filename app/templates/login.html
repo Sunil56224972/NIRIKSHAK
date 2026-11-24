@@ -2,7 +2,11 @@
 {% block title %}Sign in{% endblock %}
 {% block content %}
 <div class="gate">
-  <div class="seal"><b>{{ APP_NAME }}</b><span>{{ UNIT_NAME }} — authorised personnel only</span></div>
+  <div class="seal">
+    <img class="seal-mark" src="/static/logo.png" width="68" height="68" alt="{{ APP_NAME }} emblem">
+    <b>{{ APP_NAME }}</b>
+    <span>{{ UNIT_NAME }} — authorised personnel only</span>
+  </div>
   {% if created %}<div class="note ok">Administrator account created. Sign in to continue.</div>{% endif %}
   {% if error %}<div class="note err">{{ error }}</div>{% endif %}
   <div class="panel">

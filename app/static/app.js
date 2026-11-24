@@ -1,5 +1,40 @@
 // Small progressive enhancements only; every page works without JavaScript.
 (function () {
+  // First-visit institutional boot screen (once per tab session; CSP-safe, zero inline styles).
+  try {
+    if (window.sessionStorage && !window.sessionStorage.getItem("nk_booted")) {
+      window.sessionStorage.setItem("nk_booted", "1");
+      var boot = document.createElement("div");
+      boot.className = "boot-screen";
+      boot.setAttribute("role", "status");
+      boot.setAttribute("aria-live", "polite");
+      boot.innerHTML = (
+        '<div class="boot-inner">' +
+          '<img class="boot-mark" src="/static/logo.png" width="84" height="84" alt="NIRIKSHAK emblem">' +
+          '<div class="boot-title">NIRIKSHAK</div>' +
+          '<div class="boot-rule"></div>' +
+          '<div class="boot-sub">Cyber Crime Cell &middot; Forensic Triage System</div>' +
+          '<div class="boot-bar"><i></i></div>' +
+          '<div class="boot-note">Initialising console&hellip;</div>' +
+        '</div>'
+      );
+      document.body.insertBefore(boot, document.body.firstChild);
+      var closed = false;
+      var dismissBoot = function () {
+        if (closed) return;
+        closed = true;
+        boot.classList.add("fade-out");
+        setTimeout(function () {
+          if (boot.parentNode) boot.parentNode.removeChild(boot);
+          var uInput = document.getElementById("u");
+          if (uInput && document.activeElement === document.body) uInput.focus();
+        }, 280);
+      };
+      boot.addEventListener("click", dismissBoot);
+      setTimeout(dismissBoot, 950);
+    }
+  } catch (_) {}
+
   // Disable submit buttons while analysis runs (live checks can take ~10-20 s).
   document.querySelectorAll("form[data-busy]").forEach(function (form) {
     form.addEventListener("submit", function () {

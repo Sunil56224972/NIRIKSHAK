@@ -53,7 +53,8 @@ hr { border: 0; border-top: 1px solid var(--rule-2); margin: 14px 0; }
   max-width: 1320px; margin: 0 auto; padding: 0 18px;
   display: flex; align-items: center; gap: 22px; height: 46px;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; color: #fff; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 9px; color: #fff; white-space: nowrap; }
+.brand-mark { width: 24px; height: 24px; display: block; flex-shrink: 0; }
 .brand b { letter-spacing: .14em; font-size: 1.02rem; }
 .brand span { color: #a9b6c1; font-size: .82rem; }
 .mast nav { display: flex; gap: 2px; flex: 1; }
@@ -248,12 +249,30 @@ progress.heat.high::-moz-progress-bar { background: var(--high); }
 textarea.short { min-height: 80px; }
 h3.body { padding: 0 12px; margin-top: 14px; }
 
-/* ---- login / public -------------------------------------------------------- */
-.gate { max-width: 400px; margin: 70px auto; }
+/* ---- login / boot / public ------------------------------------------------- */
+.gate { max-width: 400px; margin: 44px auto; }
 .gate .panel .body { padding: 18px; }
-.gate .seal { text-align: center; margin-bottom: 14px; }
+.gate .seal { text-align: center; margin-bottom: 16px; }
+.seal-mark { display: block; width: 68px; height: 68px; margin: 0 auto 10px; object-fit: contain; }
 .gate .seal b { display: block; letter-spacing: .2em; font-size: 1.2rem; }
 .gate .seal span { color: var(--ink-3); font-size: .86rem; }
+
+.boot-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper); color: var(--ink);
+  transition: opacity .26s ease;
+}
+.boot-screen.fade-out { opacity: 0; pointer-events: none; }
+.boot-inner { text-align: center; padding: 24px; max-width: 360px; }
+.boot-mark { display: block; width: 84px; height: 84px; margin: 0 auto 14px; object-fit: contain; }
+.boot-title { font-size: 1.32rem; font-weight: 600; letter-spacing: .24em; color: var(--head); margin: 0; }
+.boot-rule { width: 44px; height: 2px; background: var(--band); margin: 10px auto; }
+.boot-sub { font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 16px; }
+.boot-bar { width: 180px; height: 2px; background: var(--rule); margin: 0 auto 8px; overflow: hidden; }
+.boot-bar i { display: block; height: 100%; width: 100%; background: var(--head); transform-origin: left center; animation: nkBootBar .9s ease-out forwards; }
+.boot-note { font-size: .75rem; color: var(--ink-3); font-family: var(--mono); }
+@keyframes nkBootBar { from { transform: scaleX(0.08); } to { transform: scaleX(1); } }
 .public main { max-width: 860px; }
 .warnbox { border: 1px solid #dfd2d1; border-left: 4px solid var(--high); background: var(--high-bg); padding: 14px 16px; margin-bottom: 14px; }
 .warnbox.MEDIUM { border-color: #e1d8c8; border-left-color: var(--med); background: var(--med-bg); }
@@ -356,7 +375,7 @@ svg.linkchart a:hover .lc-node { stroke: var(--head); stroke-width: 1.5; }
   footer.foot { padding: 10px 12px 24px; }
 }
 @media print {
-  .mast, .strip, .actions, .no-print, form { display: none !important; }
+  .mast, .strip, .actions, .no-print, .boot-screen, form { display: none !important; }
   body { background: #fff; }
   .panel { border-color: #999; }
 }
