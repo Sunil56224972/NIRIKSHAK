@@ -8,6 +8,10 @@
     <h1 class="mono">{{ e.display }}</h1>
   </div>
   <div class="actions">
+    <form class="inline" method="post" action="/identifiers/{{ e.id }}/enrich" data-busy="Querying live OSINT…">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn" type="submit">{{ 'Refresh live OSINT' if live_ran else 'Run live OSINT lookup' }}</button>
+    </form>
     <button type="button" class="btn plain" data-copy="{{ e.display }}">Copy value</button>
     {% if not blocklisted %}
     <form class="inline" method="post" action="/blocklist/add">
@@ -27,6 +31,110 @@
 
 <div class="cols">
   <div class="stack">
+    {% if live_intel and live_intel.data %}{% set ld = live_intel.data %}
+    <section class="panel" id="osint-panel">
+      <header><h2>Live OSINT &amp; attribution</h2><span class="aside">real-time authority &amp; telemetry lookup</span></header>
+      <div class="body">
+        {% if live_intel.kind == 'ifsc' %}
+        <table class="kv">
+          <tr><th>IFSC</th><td class="mono">{{ ld.ifsc }}</td></tr>
+          {% if ld.valid %}
+          <tr><th>Bank &amp; branch</th><td><b>{{ ld.bank }}</b> — {{ ld.branch }}</td></tr>
+          <tr><th>Branch address</th><td>{{ ld.address }}</td></tr>
+          <tr><th>City / District / State</th><td>{{ ld.city }} / {{ ld.district }} / {{ ld.state }}</td></tr>
+          {% if ld.contact %}<tr><th>Branch contact</th><td class="mono">{{ ld.contact }}</td></tr>{% endif %}
+          {% if ld.micr %}<tr><th>MICR</th><td class="mono">{{ ld.micr }}</td></tr>{% endif %}
+          <tr><th>Payment channels</th><td>{% if ld.upi %}UPI {% endif %}{% if ld.imps %}IMPS {% endif %}{% if ld.neft %}NEFT {% endif %}{% if ld.rtgs %}RTGS{% endif %}</td></tr>
+          {% else %}
+          <tr><th>RBI directory status</th><td class="bad-txt"><b>Not found (404)</b> — code does not exist in RBI IFSC directory.</td></tr>
+          {% endif %}
+        </table>
+        {% elif live_intel.kind == 'upi' %}
+        <table class="kv">
+          <tr><th>Virtual Payment Address</th><td class="mono">{{ ld.vpa }}</td></tr>
+          <tr><th>Sponsor / PSP bank</th><td><b>{{ ld.psp_bank }}</b> (<span class="mono">{{ ld.handle }}</span>)</td></tr>
+          {% if ld.embedded_mobile %}<tr><th>Embedded mobile number</th><td class="mono">{{ ld.embedded_mobile }}</td></tr>{% endif %}
+          <tr><th>Sec 94 BNSS nodal action</th><td class="mini">{{ ld.nodal_action }}</td></tr>
+        </table>
+        {% elif live_intel.kind == 'phone' %}
+        <table class="kv">
+          <tr><th>Normalised E.164</th><td class="mono">{{ ld.normalized }}</td></tr>
+          <tr><th>Classification</th><td>{{ ld.type }}{% if ld.country %} ({{ ld.country }}){% endif %}</td></tr>
+          {% if ld.mnp_note %}<tr><th>MNP note</th><td class="mini">{{ ld.mnp_note }}</td></tr>{% endif %}
+          {% if ld.nodal_action %}<tr><th>Sec 94 BNSS nodal action</th><td class="mini">{{ ld.nodal_action }}</td></tr>{% endif %}
+        </table>
+        {% elif live_intel.kind == 'ip' %}
+        <table class="kv">
+          <tr><th>IP address</th><td class="mono">{{ ld.ip }}{% if ld.ptr %} · PTR <span class="dim">{{ ld.ptr }}</span>{% endif %}</td></tr>
+          <tr><th>ASN / Organization</th><td><span class="mono">{{ ld.asn or '—' }}</span> · {{ ld.org or ld.isp or ld.network or '—' }}</td></tr>
+          <tr><th>Netblock</th><td class="mono mini">{{ ld.range or '—' }}</td></tr>
+          <tr><th>Geolocation</th><td>{{ ld.location or ld.country or '—' }}</td></tr>
+          <tr><th>RIR abuse contact</th><td class="mono">{{ ld.abuse_contacts|join(', ') or '—' }}</td></tr>
+          <tr><th>Open ports (Shodan)</th><td class="mono">{{ ld.ports|join(', ') or 'none observed' }}</td></tr>
+          {% if ld.shodan_tags %}<tr><th>Shodan tags</th><td>{% for tg in ld.shodan_tags %}<span class="tag">{{ tg }}</span> {% endfor %}</td></tr>{% endif %}
+          {% if ld.shodan_hostnames %}<tr><th>Shodan hostnames</th><td class="mono mini">{{ ld.shodan_hostnames|join(', ') }}</td></tr>{% endif %}
+          {% if ld.vulns %}<tr><th>Known CVEs</th><td class="mono mini bad-txt">{{ ld.vulns|join(', ') }}</td></tr>{% endif %}
+        </table>
+        {% elif live_intel.kind == 'crypto' %}
+        <table class="kv">
+          <tr><th>Network</th><td><b>{{ ld.network }}</b></td></tr>
+          <tr><th>Address</th><td class="mono">{{ ld.address }}</td></tr>
+          {% if ld.usdt_trc20_balance is defined %}
+          <tr><th>USDT (TRC-20) balance</th><td><b>{{ '{:,.2f}'.format(ld.usdt_trc20_balance) }} USDT</b></td></tr>
+          <tr><th>TRX balance</th><td>{{ '{:,.6f}'.format(ld.trx_balance) }} TRX</td></tr>
+          {% if ld.created %}<tr><th>Created / Last active</th><td>{{ ld.created }}{% if ld.last_activity %} · {{ ld.last_activity }}{% endif %}</td></tr>{% endif %}
+          {% elif ld.balance_btc is defined %}
+          <tr><th>Current balance</th><td><b>{{ ld.balance_btc }} BTC</b></td></tr>
+          <tr><th>Total received / sent</th><td>{{ ld.total_received_btc }} BTC received · {{ ld.total_sent_btc }} BTC sent ({{ ld.tx_count }} tx)</td></tr>
+          {% elif ld.eth_balance is defined %}
+          <tr><th>Current balance</th><td><b>{{ ld.eth_balance }} ETH</b></td></tr>
+          <tr><th>Outgoing transactions</th><td>{{ ld.outgoing_tx_count }}</td></tr>
+          {% endif %}
+          {% if ld.note %}<tr><th>Note</th><td class="mini">{{ ld.note }}</td></tr>{% endif %}
+        </table>
+        {% elif live_intel.kind == 'telegram' %}
+        <table class="kv">
+          <tr><th>Handle</th><td class="mono">{{ ld.handle }}</td></tr>
+          <tr><th>Type</th><td>{{ ld.kind or 'Telegram handle' }}</td></tr>
+          {% if ld.title %}<tr><th>Display title</th><td><b>{{ ld.title }}</b></td></tr>{% endif %}
+          {% if ld.members_or_status %}<tr><th>Subscribers / status</th><td>{{ ld.members_or_status }}</td></tr>{% endif %}
+          {% if ld.description %}<tr><th>Bio / description</th><td>{{ ld.description }}</td></tr>{% endif %}
+        </table>
+        {% elif live_intel.kind == 'apk_sha256' %}
+        <table class="kv">
+          <tr><th>SHA-256</th><td class="mono">{{ ld.sha256 }}</td></tr>
+          <tr><th>CIRCL NSRL reference</th><td>{% if ld.known_reference %}<span class="ok-txt">Matched known software:</span> {{ ld.file_name }} ({{ ld.source }}){% else %}Not present in NIST NSRL / CIRCL reference sets.{% endif %}</td></tr>
+        </table>
+        {% elif live_intel.kind == 'domain_infra' %}
+        <table class="kv">
+          <tr><th>Host / Registrable</th><td class="mono">{{ ld.host }} ({{ ld.registrable }})</td></tr>
+          {% if ld.official %}<tr><th>Official entity</th><td class="ok-txt">{{ ld.official }}</td></tr>{% endif %}
+          {% if ld.whois and ld.whois.found %}
+          <tr><th>Registration (RDAP/WHOIS)</th><td>Created {{ (ld.whois.created or '')[:10] }} ({{ ld.whois.age_days }}d ago) · Registrar: {{ ld.whois.registrar }}</td></tr>
+          {% if ld.whois.registrar_abuse_email %}<tr><th>Registrar abuse</th><td class="mono">{{ ld.whois.registrar_abuse_email }} {{ ld.whois.registrar_abuse_phone }}</td></tr>{% endif %}
+          {% endif %}
+          {% if ld.dns %}
+          <tr><th>A / AAAA</th><td class="mono">{{ (ld.dns.a + ld.dns.aaaa)|join(', ') or '—' }}</td></tr>
+          {% if ld.dns.cname %}<tr><th>CNAME</th><td class="mono mini">{{ ld.dns.cname|join(' → ') }}</td></tr>{% endif %}
+          {% if ld.dns.mx %}<tr><th>MX</th><td class="mono mini">{{ ld.dns.mx|join(', ') }}</td></tr>{% endif %}
+          <tr><th>SPF / DMARC</th><td class="mini">SPF: <span class="mono">{{ ld.dns.spf or 'missing' }}</span><br>DMARC: <span class="mono">{{ ld.dns.dmarc or 'missing' }}</span></td></tr>
+          {% endif %}
+          {% if ld.hosting and ld.hosting.ip %}
+          <tr><th>Hosting ASN / Org</th><td><span class="mono">{{ ld.hosting.ip }}</span> · <span class="mono">{{ ld.hosting.asn }}</span> {{ ld.hosting.org }} ({{ ld.hosting.location or ld.hosting.country }})</td></tr>
+          {% if ld.hosting.abuse_contacts %}<tr><th>RIR abuse contact</th><td class="mono">{{ ld.hosting.abuse_contacts|join(', ') }}</td></tr>{% endif %}
+          {% if ld.hosting.ports %}<tr><th>Open ports (Shodan)</th><td class="mono mini">{{ ld.hosting.ports|join(', ') }}</td></tr>{% endif %}
+          {% endif %}
+          {% if ld.ct and ld.ct.cert_count %}
+          <tr><th>CT logs (crt.sh)</th><td class="mini">{{ ld.ct.cert_count }} cert(s){% if ld.ct.subdomains %} · Subdomains: <span class="mono">{{ ld.ct.subdomains[:8]|join(', ') }}</span>{% endif %}</td></tr>
+          {% endif %}
+        </table>
+        {% endif %}
+      </div>
+    </section>
+    {% elif live_ran %}
+    <div class="note info" id="osint-panel">Live OSINT query completed — no external registry/explorer record exists for this identifier type or value.</div>
+    {% endif %}
+
     {% if cases or co %}
     <section class="panel">
       <header><h2>Link diagram</h2><span class="aside">click any node to inspect</span></header>

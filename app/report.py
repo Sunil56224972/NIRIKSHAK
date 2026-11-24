@@ -189,8 +189,34 @@ def _technical(case: dict) -> list[tuple[str, str]]:
                                             f"nameservers: {', '.join(w.get('nameservers', []))}"))
     if net.get("dns"):
         h = net.get("hosting") or {}
-        out.append(("DNS / hosting", f"A/AAAA: {', '.join(net['dns'])}\nnetwork: {h.get('network', '')}  org: {h.get('org', '')}  "
-                                      f"country: {h.get('country', '')}"))
+        host_line = f"A/AAAA: {', '.join(net['dns'])}\nnetwork: {h.get('network', '')}  ASN: {h.get('asn', '')}  org: {h.get('org', '')}  location: {h.get('location') or h.get('country', '')}"
+        if h.get("ptr"):
+            host_line += f"\nreverse PTR: {h['ptr']}"
+        if h.get("abuse_contacts"):
+            host_line += f"\nRIR abuse contact: {', '.join(h['abuse_contacts'])}"
+        if h.get("ports"):
+            host_line += f"\nShodan open ports: {', '.join(str(p) for p in h['ports'])}"
+        if h.get("shodan_tags"):
+            host_line += f"   tags: {', '.join(h['shodan_tags'])}"
+        if h.get("vulns"):
+            host_line += f"\nShodan CVEs: {', '.join(h['vulns'][:8])}"
+        out.append(("DNS / hosting / Shodan", host_line))
+    if net.get("dns_records"):
+        dr = net["dns_records"]
+        dr_lines = [p for p in [
+            f"CNAME: {', '.join(dr['cname'])}" if dr.get("cname") else "",
+            f"MX: {', '.join(dr['mx'])}" if dr.get("mx") else "",
+            f"SPF: {dr['spf']}" if dr.get("spf") else "",
+            f"DMARC: {dr['dmarc']}" if dr.get("dmarc") else "",
+        ] if p]
+        if dr_lines:
+            out.append(("DNS authentication & routing (DoH)", "\n".join(dr_lines)))
+    if net.get("ct") and net["ct"].get("cert_count"):
+        ct = net["ct"]
+        ct_line = f"CT logged certificates: {ct['cert_count']} (earliest: {ct.get('earliest_cert', 'n/a')})"
+        if ct.get("subdomains"):
+            ct_line += f"\nsibling subdomains: {', '.join(ct['subdomains'][:10])}"
+        out.append(("Certificate Transparency (crt.sh)", ct_line))
     if net.get("http"):
         chain = net["http"].get("chain", [])
         out.append(("HTTP redirect chain", "\n".join(f"{c['status']}  {c['url']}" for c in chain) +
@@ -221,7 +247,41 @@ def _technical(case: dict) -> list[tuple[str, str]]:
         out.append(("E-mail headers", "\n".join(f"{k}: {v}" for k, v in d["email_headers"].items() if v)))
     if d.get("sender", {}).get("value"):
         s = d["sender"]
-        out.append(("Sender", f"{s['value']}  ({s.get('type', 'unclassified')})"))
+        s_txt = f"{s['value']}  ({s.get('type', 'unclassified')})"
+        if s.get("note"):
+            s_txt += f"\n{s['note']}"
+        out.append(("Sender", s_txt))
+    lo = d.get("live_osint") or {}
+    if lo.get("ifsc"):
+        lines_ifsc = []
+        for b in lo["ifsc"]:
+            if b.get("valid"):
+                lines_ifsc.append(f"{b['ifsc']} -> {b.get('bank', '')} | Branch: {b.get('branch', '')} | {b.get('address', '')}, {b.get('city', '')}, {b.get('state', '')}")
+            else:
+                lines_ifsc.append(f"{b['ifsc']} -> INVALID (not found in RBI IFSC directory)")
+        out.append(("Live RBI IFSC branch lookup", "\n".join(lines_ifsc)))
+    if lo.get("crypto"):
+        lines_cr = []
+        for w in lo["crypto"]:
+            if "usdt_trc20_balance" in w:
+                lines_cr.append(f"{w['address']} ({w['network']}) -> {w['usdt_trc20_balance']:,.2f} USDT | {w['trx_balance']:,.2f} TRX | last active: {w.get('last_activity') or 'n/a'}")
+            elif "balance_btc" in w:
+                lines_cr.append(f"{w['address']} (Bitcoin) -> {w['tx_count']} tx | received: {w['total_received_btc']} BTC | balance: {w['balance_btc']} BTC")
+            elif "eth_balance" in w:
+                lines_cr.append(f"{w['address']} (Ethereum) -> {w['outgoing_tx_count']} outgoing tx | balance: {w['eth_balance']} ETH")
+        if lines_cr:
+            out.append(("Live blockchain wallet telemetry", "\n".join(lines_cr)))
+    if lo.get("apk_c2"):
+        lines_c2 = []
+        for c2 in lo["apk_c2"]:
+            h = c2.get("hosting") or {}
+            w = c2.get("whois") or {}
+            lines_c2.append(
+                f"{c2['target']} -> IP: {h.get('ip', '')} ({h.get('asn', '')} {h.get('org', '')}, {h.get('country', '')})"
+                + (f" | Abuse: {', '.join(h['abuse_contacts'])}" if h.get("abuse_contacts") else "")
+                + (f" | Reg: {w.get('registrar', '')} ({w.get('age_days', '')}d old)" if w.get("found") else "")
+            )
+        out.append(("APK C2 live infrastructure", "\n".join(lines_c2)))
     if d.get("ai"):
         ai = d["ai"]
         ai_lines = [f"model: {ai.get('provider', 'Groq')} {ai.get('model', '')}"]

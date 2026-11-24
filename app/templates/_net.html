@@ -9,15 +9,30 @@
       <tr><th>Registered</th><td>{{ (w.created or '')[:10] }}{% if w.age_days is not none %} — <b class="{{ 'bad-txt' if w.age_days < 90 }}">{{ w.age_days }} days ago</b>{% endif %}</td></tr>
       <tr><th>Expires</th><td>{{ (w.expires or '')[:10] }}</td></tr>
       <tr><th>Registrar</th><td>{{ w.registrar }}</td></tr>
-      <tr><th>Registrar abuse</th><td class="mono">{{ w.registrar_abuse_email }} {{ w.registrar_abuse_phone }}</td></tr>
-      <tr><th>Nameservers</th><td class="mono mini">{{ w.nameservers|join(', ') }}</td></tr>
-      <tr><th>Registry status</th><td class="mini">{{ w.status|join(', ') }}</td></tr>
+      {% if w.registrar_abuse_email or w.registrar_abuse_phone %}<tr><th>Registrar abuse</th><td class="mono">{{ w.registrar_abuse_email }} {{ w.registrar_abuse_phone }}</td></tr>{% endif %}
+      <tr><th>Nameservers</th><td class="mono mini">{{ w.nameservers|join(', ') or '—' }}</td></tr>
+      {% if w.status %}<tr><th>Registry status</th><td class="mini">{{ w.status|join(', ') }}</td></tr>{% endif %}
       {% else %}<tr><th>Registration</th><td>No registry record</td></tr>{% endif %}
+    {% endif %}
+    {% if lnet.dns_records %}{% set dr = lnet.dns_records %}
+      {% if dr.cname %}<tr><th>CNAME chain</th><td class="mono mini">{{ dr.cname|join(' → ') }}</td></tr>{% endif %}
+      {% if dr.mx %}<tr><th>Mail servers (MX)</th><td class="mono mini">{{ dr.mx|join(', ') }}</td></tr>{% endif %}
+      <tr><th>Mail auth (DoH)</th><td class="mini">SPF: <span class="mono">{{ 'present' if dr.spf else 'missing' }}</span> · DMARC: {% if dr.dmarc_policy in ('reject', 'quarantine') %}<span class="ok-txt mono">p={{ dr.dmarc_policy }}</span>{% elif dr.dmarc_policy %}<span class="mono">p={{ dr.dmarc_policy }}</span>{% else %}<span class="dim mono">missing</span>{% endif %}</td></tr>
+    {% endif %}
+    {% if lnet.ct and lnet.ct.cert_count %}
+      <tr><th>CT logs (crt.sh)</th><td class="mini"><b>{{ lnet.ct.cert_count }}</b> cert(s){% if lnet.ct.earliest_cert %} · earliest {{ lnet.ct.earliest_cert }}{% endif %}{% if lnet.ct.subdomains %}<div class="mono mini">Subdomains: {{ lnet.ct.subdomains[:8]|join(', ') }}</div>{% endif %}</td></tr>
     {% endif %}
   </table>
   <table class="kv">
     <tr><th>Resolves to</th><td class="mono">{{ (lnet.dns or [])|join(', ') or '—' }}</td></tr>
-    {% if lnet.hosting %}<tr><th>Hosting network</th><td>{{ lnet.hosting.network }} {{ lnet.hosting.org }} <span class="dim">{{ lnet.hosting.country }}</span></td></tr>{% endif %}
+    {% if lnet.hosting %}{% set h = lnet.hosting %}
+      {% if h.ptr %}<tr><th>Reverse DNS (PTR)</th><td class="mono mini">{{ h.ptr }}</td></tr>{% endif %}
+      <tr><th>Hosting / ASN</th><td>{% if h.asn %}<span class="mono">{{ h.asn }}</span> · {% endif %}{{ h.org or h.isp or h.network or '—' }}{% if h.location or h.country %} <span class="dim">({{ h.location or h.country }})</span>{% endif %}</td></tr>
+      {% if h.abuse_contacts %}<tr><th>RIR abuse contact</th><td class="mono mini">{{ h.abuse_contacts|join(', ') }}</td></tr>{% endif %}
+      {% if h.ports %}<tr><th>Open ports (Shodan)</th><td class="mono mini">{{ h.ports|join(', ') }}</td></tr>{% endif %}
+      {% if h.shodan_tags %}<tr><th>Shodan tags</th><td>{% for tg in h.shodan_tags %}<span class="tag">{{ tg }}</span> {% endfor %}</td></tr>{% endif %}
+      {% if h.vulns %}<tr><th>Known CVEs (Shodan)</th><td class="mono mini bad-txt">{{ h.vulns[:6]|join(', ') }}{% if h.vuln_count > 6 %} (+{{ h.vuln_count - 6 }} more){% endif %}</td></tr>{% endif %}
+    {% endif %}
     {% if lnet.tls %}{% set t = lnet.tls %}
     <tr><th>TLS</th><td>{% if t.verified %}<span class="ok-txt">valid</span>{% else %}<span class="bad-txt">invalid — {{ t.verify_error }}</span>{% endif %} · {{ t.protocol }}</td></tr>
     <tr><th>Certificate issuer</th><td>{{ t.issuer }}</td></tr>

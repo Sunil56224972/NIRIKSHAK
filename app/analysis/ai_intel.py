@@ -149,6 +149,11 @@ def _build_evidence_summary(
         "extracted_iocs": iocs_brief,
     }
 
+    if details.get("live_osint"):
+        summary["live_osint"] = details["live_osint"]
+    if details.get("sender") and (details["sender"] or {}).get("trai"):
+        summary["trai_dlt_sender"] = details["sender"]["trai"]
+
     if kind in ("url", "website"):
         info = details.get("info") or (details.get("url_report") or {}).get("info") or {}
         net = details.get("net") or (details.get("url_report") or {}).get("net") or {}
@@ -159,6 +164,8 @@ def _build_evidence_summary(
             "tld": info.get("tld", ""),
             "whois": net.get("whois") or {},
             "hosting": net.get("hosting") or {},
+            "dns_records": net.get("dns_records") or {},
+            "ct": net.get("ct") or {},
             "final_url": net.get("final_url", ""),
         }
         if page:
@@ -383,6 +390,7 @@ def ask_case_question(case: dict[str, Any], question: str) -> dict[str, Any] | N
             if det.get("apk")
         },
         "network_summary": (det.get("net") or (det.get("url_report") or {}).get("net") or {}),
+        "live_osint": det.get("live_osint") or {},
     }
 
     system_prompt = (

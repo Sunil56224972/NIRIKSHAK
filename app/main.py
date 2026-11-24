@@ -780,7 +780,7 @@ def identifiers(request: Request, q: str = "", type: str = "", linked: str = "")
 
 
 @app.get("/identifiers/{ent_id}", response_class=HTMLResponse)
-def identifier_view(request: Request, ent_id: int):
+def identifier_view(request: Request, ent_id: int, live: int = 0):
     officer(request)
     db = get_db()
     e = db.one("nk_entities", {"id": f"eq.{ent_id}"})
@@ -807,8 +807,26 @@ def identifier_view(request: Request, ent_id: int):
             a["together"] = len(a["together"])
     bl = db.select("nk_blocklist", {"etype": f"eq.{e['etype']}", "value": f"eq.{e['value']}"})
     chart_svg = linkchart.render_identifier_svg(e, cases_, co)
+    live_intel = {}
+    if live == 1 and config.LIVE_CHECKS:
+        from .analysis import osint
+        live_intel = osint.enrich_identifier(e["etype"], e["value"])
+    elif e["etype"] in ("upi", "phone"):
+        from .analysis import osint
+        live_intel = osint.enrich_identifier(e["etype"], e["value"])
     return page(request, "identifier.html", {"nav": "ids", "e": e, "cases": cases_, "co": co,
-                                            "blocklisted": bl, "chart_svg": chart_svg})
+                                            "blocklisted": bl, "chart_svg": chart_svg, "live_intel": live_intel, "live_ran": live == 1})
+
+
+@app.post("/identifiers/{ent_id}/enrich")
+def identifier_enrich(request: Request, ent_id: int, csrf_token: str = Form("")):
+    check_csrf(request, csrf_token)
+    officer(request)
+    e = get_db().one("nk_entities", {"id": f"eq.{ent_id}"})
+    if not e:
+        raise NotFound()
+    auth.audit(request, "osint_enrich", e["value"], e["etype"])
+    return RedirectResponse(f"/identifiers/{ent_id}?live=1#osint-panel", 303)
 
 
 @app.get("/heatlist", response_class=HTMLResponse)
@@ -908,7 +926,12 @@ def blocklist_sync(request: Request, feed: str, csrf_token: str = Form("")):
         return RedirectResponse("/blocklist", 303)
     try:
         res = feeds.sync(get_db(), feed, u["username"])
-        msg = f"{res['feed']}: {res['urls']} URLs, {res['domains']} domains processed"
+        parts = [p for p in [
+            f"{res['urls']} URLs" if res.get("urls") else "",
+            f"{res['domains']} domains" if res.get("domains") else "",
+            f"{res['ips']} C2 IPs" if res.get("ips") else "",
+        ] if p] or ["0 new entries"]
+        msg = f"{res['feed']}: {', '.join(parts)} processed"
     except Exception as exc:
         msg = f"Feed sync failed: {exc.__class__.__name__}: {str(exc)[:120]}"
     auth.audit(request, "feed_sync", feed, msg)

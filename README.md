@@ -94,11 +94,11 @@ Fraud campaigns regularly reuse the same mule UPI IDs, bank accounts, phone numb
   - Computes 8x8 perceptual average hash (`ahash`) of the launcher icon and correlates against previously flagged APKs for icon cloning, signing certificate reuse, app name clones, and package-family similarity.
 - Supports app-store URLs on Google Play (`play.google.com`, `market://`), Apple App Store (`apps.apple.com`), and third-party APK portals (`apkpure`, `uptodown`, `apkcombo`, `apkmirror`).
 
-### 5. Actionable Identifier Extraction (`app/analysis/iocs.py`)
-Normalises and extracts identifiers into `nk_entities` for cross-case correlation:
-- **Payment:** UPI VPAs & `upi://pay` links (attributed to NPCI PSP sponsor banks), bank account numbers, RBI IFSC codes (mapped to bank names), and checksum-validated crypto wallets (TRON USDT TRC-20, EVM/ETH/BSC, Bitcoin legacy & bech32).
-- **Telecom & Messaging:** Indian mobile numbers (`+91`), toll-free numbers, Telegram handles/channels, WhatsApp click-to-chat numbers & group invites, and e-mail addresses.
-- **Infrastructure & Apps:** URLs, registrable/full domains, IPv4 addresses, Android package names, APK SHA-256 digests, and signing certificate SHA-256 fingerprints.
+### 5. Actionable Identifier Extraction & Live OSINT Attribution (`app/analysis/iocs.py`, `app/analysis/osint.py`)
+Normalises, extracts, and live-enriches identifiers into `nk_entities` for cross-case correlation and on-demand dossier lookups (`/identifiers/{id}/enrich`):
+- **Payment & Banking:** UPI VPAs & `upi://pay` links (attributed to NPCI PSP sponsor banks with automatic embedded `+91` mobile pivoting), bank account numbers, **live RBI IFSC directory verification (`ifsc.razorpay.com` — resolves exact bank, branch, street address, city, district & state, and flags fabricated IFSC codes)**, and **live blockchain wallet telemetry** across **TRON (`api.trongrid.io` — TRX + USDT TRC-20 balance & activity)**, **Bitcoin (`mempool.space` — tx count, total received & balance)**, and **Ethereum / EVM (`eth_getBalance` / `eth_getTransactionCount`)**.
+- **Telecom & Messaging:** Indian mobile numbers (`+91` E.164), **TRAI DLT SMS header decoding** (resolving exact Access Provider — Airtel/Jio/Vi/BSNL, origin telecom circle, and Service/Transactional/Promotional/Government stream, while flagging forged prefixes or promotional-header banking lures), live **Telegram `t.me` channel/group/bot preview metadata**, WhatsApp click-to-chat numbers & group invites, and e-mail addresses (with **live Google DoH MX, SPF & DMARC verification**).
+- **Infrastructure, Exposure & Apps:** **Google DNS-over-HTTPS (`dns.google`)** for `A`/`AAAA`/`CNAME`/`MX`/`NS`/`SPF`/`DMARC` (detecting custom domains CNAME-cloaked onto disposable tunnels), **ipwho.is + RIPEstat** for BGP ASN, ISP/org, geolocation & **RIR abuse contact e-mails**, **Shodan InternetDB (`internetdb.shodan.io`)** for open ports, CPEs, threat tags & CVEs, **Certificate Transparency (`crt.sh`)** for certificate counts & sibling subdomains, **CIRCL NSRL `hashlookup`** for APK SHA-256 digests, and **live probing of C2 domains/IPs extracted from APK `classes.dex`**.
 
 ### 6. AI Forensic Intelligence & Multimodal Vision OCR (`app/analysis/ai_intel.py`)
 - **Groq Vision OCR (`qwen/qwen3.8-27b`):** Automatically transcribes text verbatim (URLs, UPI IDs, phone numbers, bank details, Hindi/Hinglish text, and brand cues) from uploaded scam/website screenshots on serverless hosts with local Tesseract/WinRT and Cloud OCR fallbacks.
@@ -111,7 +111,7 @@ Normalises and extracts identifiers into `nk_entities` for cross-case correlatio
 
 - **Additive Risk Scoring (`app/analysis/scoring.py`):** Indicators carry explicit positive or negative weights summed into `0–100` (`LOW < 30`, `MEDIUM 30–59`, `HIGH >= 60`). Decisive intelligence enforces score floors: local blocklist match (`>= 75`), identifier linked to a case closed as confirmed fraud (`>= 65`), Google Safe Browsing hit (`>= 80`).
 - **Cross-Case Correlation & Clustering (`app/service.py`, `app/analysis/similarity.py`):** Links every extracted identifier across messages, URLs, websites, and APKs; detects repeat scam scripts using 4-word shingle Jaccard similarity; renders clickable 3-column SVG link diagrams (`app/analysis/linkchart.py`).
-- **Blocklist & Live Threat Feeds (`app/feeds.py`):** Closing a case as *fraud confirmed* promotes its non-shared malicious indicators to `nk_blocklist`. Administrators can also sync active threat feeds from **OpenPhish** and **Phishing Army**.
+- **Blocklist & Live Threat Feeds (`app/feeds.py`):** Closing a case as *fraud confirmed* promotes its non-shared malicious indicators to `nk_blocklist`. Administrators can also sync five active public threat feeds: **OpenPhish**, **Phishing.Database (Active Now)**, **Phishing Army**, **abuse.ch Feodo Tracker (banking trojan C2 IPs)**, and **abuse.ch SSLBL (botnet C2 IPs)**.
 - **Investigation Exports:**
   - **PDF Case Report (`app/report.py`):** ReportLab dossier with case metadata, weighted indicator breakdown, attributed IOCs, linked cases, technical telemetry, evidence SHA-256 manifest, and audit trail.
   - **Nodal Notice (`app/notice.py`):** Plain-text Section 94 BNSS / Section 91 CrPC action summary grouped by Payment/Banking, Telecom/Messaging, Domain Registrar/Hosting, and Mobile App identifiers.
@@ -169,8 +169,9 @@ Normalises and extracts identifiers into `nk_entities` for cross-case correlatio
 │   │   ├── brands.py       # Impersonation reference domains/packages, free hosts, shorteners
 │   │   ├── iocs.py         # IOC extraction & UPI PSP / RBI IFSC / crypto attribution
 │   │   ├── linkchart.py    # CSP-safe SVG entity correlation diagram
-│   │   ├── message.py      # SMS/WhatsApp/email scam & header analyzer
+│   │   ├── message.py      # SMS/WhatsApp/email scam, TRAI DLT & live DNS auth analyzer
 │   │   ├── netintel.py     # SSRF-safe HTTP fetcher, RDAP, port-43 WHOIS, TLS, GSB
+│   │   ├── osint.py        # Live DoH DNS, Shodan InternetDB, RIPEstat, crt.sh, RBI IFSC & crypto RPCs
 │   │   ├── scoring.py      # Explainable weighted Indicator & Findings model
 │   │   ├── similarity.py   # 4-word shingle bottom-k Jaccard template matching
 │   │   ├── urlscan.py      # Lexical, homoglyph/punycode & live infrastructure checks

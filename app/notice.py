@@ -66,6 +66,10 @@ def build_notice(case: dict, entities: list[dict], officer: dict) -> str:
         "",
     ]
 
+    lo = details.get("live_osint") or {}
+    ifsc_map = {b["ifsc"]: b for b in (lo.get("ifsc") or []) if b.get("ifsc")}
+    crypto_map = {w["address"].lower(): w for w in (lo.get("crypto") or []) if w.get("address")}
+
     # Section A: Payment / Banking Nodal Action
     lines.append("SECTION A — PAYMENT / BANKING NODAL ACTION (UPI, BANK ACCOUNTS, IFSC, CRYPTO)")
     lines.append("-" * 78)
@@ -79,17 +83,38 @@ def build_notice(case: dict, entities: list[dict], officer: dict) -> str:
         sec_a.append(_fmt_entity_line(e, "Bank Account"))
     for e in by_type.get("ifsc", []):
         code = (e.get("value") or "").upper()
-        bank = IFSC_BANKS.get(code[:4], f"Bank code {code[:4]}")
-        sec_a.append(_fmt_entity_line(e, f"IFSC · {bank}"))
+        binfo = ifsc_map.get(code)
+        if binfo and binfo.get("valid"):
+            extra = f"IFSC · {binfo.get('bank', '')} · Branch: {binfo.get('branch', '')}, {binfo.get('city', '')}, {binfo.get('state', '')}"
+            sec_a.append(_fmt_entity_line(e, extra))
+            if binfo.get("address"):
+                sec_a.append(f"  RBI Branch Address -> {binfo['address']}" + (f" | Tel: {binfo['contact']}" if binfo.get("contact") else ""))
+        elif binfo and binfo.get("valid") is False:
+            sec_a.append(_fmt_entity_line(e, "IFSC · INVALID / NON-EXISTENT IN RBI DIRECTORY"))
+        else:
+            bank = IFSC_BANKS.get(code[:4], f"Bank code {code[:4]}")
+            sec_a.append(_fmt_entity_line(e, f"IFSC · {bank}"))
     for e in by_type.get("crypto", []):
         sec_a.append(_fmt_entity_line(e, ETYPE_LABELS.get("crypto", "Crypto wallet")))
+        winfo = crypto_map.get((e.get("value") or "").lower()) or crypto_map.get(e.get("display") or "")
+        if winfo:
+            if "usdt_trc20_balance" in winfo:
+                sec_a.append(f"  On-Chain (TRON) -> {winfo['usdt_trc20_balance']:,.2f} USDT | {winfo['trx_balance']:,.2f} TRX | Last op: {winfo.get('last_activity') or 'n/a'}")
+            elif "balance_btc" in winfo:
+                sec_a.append(f"  On-Chain (BTC)  -> {winfo['tx_count']} tx | Total received: {winfo['total_received_btc']} BTC | Current bal: {winfo['balance_btc']} BTC")
+            elif "eth_balance" in winfo:
+                sec_a.append(f"  On-Chain (ETH)  -> {winfo['outgoing_tx_count']} outgoing tx | Current bal: {winfo['eth_balance']} ETH")
     lines.extend(sec_a if sec_a else ["(none extracted for this case)"])
     lines.append("")
 
     # Section B: Telecom / Messaging Nodal Action
-    lines.append("SECTION B — TELECOM / MESSAGING NODAL ACTION (PHONES, TELEGRAM, WHATSAPP, EMAIL)")
+    lines.append("SECTION B — TELECOM / MESSAGING NODAL ACTION (PHONES, DLT HEADERS, TELEGRAM, WHATSAPP, EMAIL)")
     lines.append("-" * 78)
     sec_b = []
+    trai = (details.get("sender") or {}).get("trai")
+    if trai:
+        sec_b.append(f"- SMS Sender Header: {trai['header']} [TSP: {trai['operator']} | Circle: {trai['circle']} | Stream: {trai['stream']}]")
+        sec_b.append(f"  Nodal Action -> {trai['nodal_hint']}")
     for t in ("phone", "telegram", "whatsapp_group", "email"):
         lbl = ETYPE_LABELS.get(t, t)
         for e in by_type.get(t, []):
@@ -121,11 +146,24 @@ def build_notice(case: dict, entities: list[dict], officer: dict) -> str:
         if h.get("ip") or h.get("org") or h.get("network"):
             host_parts = [p for p in [
                 f"IP: {h['ip']}" if h.get("ip") else "",
+                f"ASN: {h['asn']}" if h.get("asn") else "",
                 f"Network: {h['network']}" if h.get("network") else "",
                 f"Org: {h['org']}" if h.get("org") else "",
-                f"Country: {h['country']}" if h.get("country") else "",
+                f"Location: {h.get('location') or h.get('country', '')}" if (h.get("location") or h.get("country")) else "",
+                f"RIR Abuse Email: {', '.join(h['abuse_contacts'])}" if h.get("abuse_contacts") else "",
             ] if p]
             sec_c.append("  Hosting -> " + " | ".join(host_parts))
+    for c2 in (details.get("live_osint") or {}).get("apk_c2") or []:
+        h = c2.get("hosting") or {}
+        w = c2.get("whois") or {}
+        c2_parts = [p for p in [
+            f"APK C2: {c2['target']}",
+            f"IP: {h['ip']}" if h.get("ip") else "",
+            f"ASN/Org: {h.get('asn', '')} {h.get('org', '')}".strip() if (h.get("asn") or h.get("org")) else "",
+            f"Abuse Email: {', '.join(h['abuse_contacts'])}" if h.get("abuse_contacts") else "",
+            f"Registrar: {w['registrar']} ({w.get('registrar_abuse_email', '')})" if w.get("registrar") else "",
+        ] if p]
+        sec_c.append("  " + " | ".join(c2_parts))
     lines.extend(sec_c if sec_c else ["(none extracted for this case)"])
     lines.append("")
 

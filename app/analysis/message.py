@@ -9,7 +9,9 @@ import email
 import email.policy
 import re
 
+from .. import config
 from . import iocs as ioc_mod
+from . import osint
 from . import urlscan
 from .brands import BRANDS
 from .scoring import Findings
@@ -116,8 +118,8 @@ def _brand_mentions(text: str) -> list[str]:
     return out
 
 
-def _email_headers(text: str, f: Findings) -> dict:
-    """If raw e-mail source is pasted, inspect From / Reply-To / authentication results."""
+def _email_headers(text: str, f: Findings, *, run_live: bool = True) -> dict:
+    """If raw e-mail source is pasted, inspect From / Reply-To / authentication results & live DNS SPF/DMARC."""
     if not re.search(r"^(?:From|Received|Return-Path|Message-ID):", text, re.M | re.I):
         return {}
     msg = email.message_from_string(text, policy=email.policy.default)
@@ -135,6 +137,19 @@ def _email_headers(text: str, f: Findings) -> dict:
         if m and m.group(1) in ("fail", "softfail", "none", "permerror"):
             f.add(f"mail.{mech}", f"{mech.upper()} check: {m.group(1)}",
                   f"The sending server is not authorised for {from_dom or 'the sender domain'}.", 12, "network", m.group(0))
+    freemail_doms = ("gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "rediffmail.com")
+    if run_live and config.LIVE_CHECKS and from_dom and from_dom not in freemail_doms:
+        dns_info = osint.dns_forensics(from_dom)
+        if dns_info:
+            info["Live-DNS-MX"] = ", ".join(dns_info.get("mx") or []) or "none"
+            info["Live-DNS-SPF"] = dns_info.get("spf") or "missing"
+            info["Live-DNS-DMARC"] = dns_info.get("dmarc") or "missing"
+            if not dns_info.get("mx") and not dns_info.get("a"):
+                f.add("mail.dead_domain", "Sender domain has no live MX or A record",
+                      f"{from_dom} cannot receive mail in live DNS — likely spoofed or taken down.", 16, "network", from_dom)
+            elif not dns_info.get("dmarc") and not urlscan.is_official(from_dom):
+                f.add("mail.no_dmarc", "Sender domain publishes no DMARC policy",
+                      f"Live DNS lookup found no _dmarc.{dns_info.get('registrable', from_dom)} TXT policy.", 8, "network", from_dom)
     display = from_addr[0].lower()
     for b in BRANDS:
         if any(k in display for k in [b["name"].lower()] + [k for k in b["keywords"] if len(k) > 3]):
@@ -142,7 +157,7 @@ def _email_headers(text: str, f: Findings) -> dict:
                 f.add("mail.display_spoof", f"Sender name claims {b['name']}",
                       f"Display name '{from_addr[0]}' but address is {from_addr[1]}.", 20, "content", from_addr[1])
             break
-    if from_dom in ("gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "rediffmail.com") and _brand_mentions(info["Subject"] + text[:2000]):
+    if from_dom in freemail_doms and _brand_mentions(info["Subject"] + text[:2000]):
         f.add("mail.freemail", "Official-looking message from a free mailbox",
               f"Sent from {from_dom}; banks and departments use their own domains.", 12, "content", from_addr[1])
     body = msg.get_body(preferencelist=("plain", "html"))
@@ -153,7 +168,7 @@ def _email_headers(text: str, f: Findings) -> dict:
 def analyze(text: str, channel: str = "sms", sender: str = "", run_live: bool = True) -> dict:
     f = Findings()
     raw = text.strip()
-    header_info = _email_headers(raw, f) if channel == "email" else {}
+    header_info = _email_headers(raw, f, run_live=run_live) if channel == "email" else {}
     body = header_info.pop("_body", "") or raw
     norm = re.sub(r"[ \t]+", " ", body)
 
@@ -194,9 +209,27 @@ def analyze(text: str, channel: str = "sms", sender: str = "", run_live: bool = 
                 f.add("msg.sender_mobile", "Official-sounding message sent from a personal mobile number",
                       f"Banks, DISCOMs and government send bulk SMS from registered headers (e.g. AX-SBIINB), not from {sender}.",
                       22, "content", sender)
-        elif TRAI_HEADER.match(sender.upper()):
-            sender_info["type"] = "TRAI DLT registered header"
-            sender_info["note"] = "Registered headers can still be abused by compromised telemarketers; verify against the entity."
+        elif TRAI_HEADER.match(sender.upper()) or osint.decode_trai_header(sender):
+            trai = osint.decode_trai_header(sender)
+            if trai and trai["valid_dlt_prefix"]:
+                sender_info["type"] = f"TRAI DLT header ({trai['operator']} · {trai['circle']} · {trai['stream']})"
+                sender_info["trai"] = trai
+                sender_info["note"] = trai["nodal_hint"]
+                if (trai["stream_code"] == "P" or trai["is_promotional_numeric"]) and (
+                    brands or any(k in categories for k in ("Fake KYC / account block", "Electricity bill disconnection",
+                                                           "Digital arrest / impersonation of police"))
+                ):
+                    f.add("msg.promo_header_mismatch", "Promotional SMS header used for official / banking alert",
+                          f"Header {trai['header']} is a promotional route ({trai['operator']}, {trai['circle']}) — real banks and agencies use Service/Transactional (-S/-T/-G) headers.",
+                          16, "content", trai["header"])
+            elif trai:
+                sender_info["type"] = "Invalid / spoofed SMS header prefix"
+                sender_info["trai"] = trai
+                f.add("msg.fake_dlt_header", "Sender header uses unrecognised TRAI TSP / circle prefix",
+                      trai["nodal_hint"], 16, "content", trai["header"])
+            else:
+                sender_info["type"] = "TRAI DLT registered header"
+                sender_info["note"] = "Registered headers can still be abused by compromised telemarketers; verify against the entity."
         elif sender.startswith("+") and not sender.startswith("+91"):
             sender_info["type"] = "international number"
             f.add("msg.sender_foreign", "Sent from an international number",

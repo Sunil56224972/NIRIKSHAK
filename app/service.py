@@ -5,6 +5,7 @@ import hashlib
 import json
 import mimetypes
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from . import config
@@ -12,6 +13,8 @@ from .analysis import ai_intel
 from .analysis import apk as apk_mod
 from .analysis import iocs as ioc_mod
 from .analysis import message as msg_mod
+from .analysis import netintel
+from .analysis import osint
 from .analysis import similarity
 from .analysis import website as web_mod
 from .analysis import urlscan
@@ -19,6 +22,184 @@ from .analysis.scoring import Findings
 from .db import DBError, Supabase, in_list
 
 KIND_LABEL = {"message": "Message", "url": "URL", "website": "Website", "apk": "Android app"}
+
+
+def _enrich_live(kind: str, result: dict, *, run_live: bool) -> dict:
+    """Enrich extracted financial, crypto, telecom, and APK C2 indicators against live OSINT authorities."""
+    if not (run_live and config.LIVE_CHECKS):
+        return result
+    f: Findings = result["findings"]
+    iocs: list[dict] = result.get("iocs") or []
+    live_osint: dict = {}
+
+    # 1. Instant UPI handle & embedded mobile correlation
+    upi_items = [it for it in iocs if it.get("etype") == "upi"][:6]
+    existing_phones = {it.get("value") for it in iocs if it.get("etype") == "phone"}
+    if upi_items:
+        upi_rows = []
+        for it in upi_items:
+            uinfo = osint.inspect_upi(it["value"])
+            upi_rows.append(uinfo)
+            mob = uinfo.get("embedded_mobile")
+            if mob and mob not in existing_phones:
+                existing_phones.add(mob)
+                iocs.append({
+                    "etype": "phone",
+                    "value": mob,
+                    "display": f"+91 {mob[3:8]} {mob[8:]}",
+                    "context": f"mobile number embedded in UPI ID {it['display']}",
+                })
+        live_osint["upi"] = upi_rows
+
+    ifsc_items = [it for it in iocs if it.get("etype") == "ifsc"][:5]
+    crypto_items = [it for it in iocs if it.get("etype") == "crypto"][:4]
+    tg_items = [it for it in iocs if it.get("etype") == "telegram"][:3]
+
+    apk_meta = (result.get("details") or {}).get("apk") or {}
+    apk_sha = apk_meta.get("sha256", "") if kind == "apk" else ""
+    apk_c2_domains: list[str] = []
+    apk_c2_ips: list[str] = []
+    if kind == "apk" and apk_meta:
+        for it in iocs:
+            if it.get("etype") == "domain" and not urlscan.is_official(it["value"]) and it["value"] not in apk_c2_domains:
+                apk_c2_domains.append(it["value"])
+            elif it.get("etype") == "ip" and netintel.is_public_ip(it["value"]) and it["value"] not in apk_c2_ips:
+                apk_c2_ips.append(it["value"])
+        apk_c2_domains = apk_c2_domains[:3]
+        apk_c2_ips = apk_c2_ips[:3]
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        fut_ifsc = {it["value"]: pool.submit(osint.lookup_ifsc, it["value"]) for it in ifsc_items}
+        fut_crypto = {it["value"]: pool.submit(osint.inspect_crypto, it["value"]) for it in crypto_items}
+        fut_tg = {it["value"]: pool.submit(osint.inspect_telegram, it["value"]) for it in tg_items}
+        fut_hash = pool.submit(osint.hashlookup_sha256, apk_sha) if apk_sha else None
+        fut_c2_dom = {d: pool.submit(osint.enrich_identifier, "domain", d) for d in apk_c2_domains}
+        fut_c2_ip = {ip: pool.submit(osint.inspect_ip, ip) for ip in apk_c2_ips}
+
+        # Collect IFSC branch records
+        ifsc_out = []
+        for it in ifsc_items:
+            try:
+                res = fut_ifsc[it["value"]].result(timeout=5.0)
+            except Exception:
+                res = None
+            if not res:
+                continue
+            ifsc_out.append(res)
+            if res.get("valid") is False:
+                f.add("fin.invalid_ifsc", f"Fabricated / non-existent RBI IFSC: {res['ifsc']}",
+                      "Live lookup against the RBI IFSC directory returned 404 — common in forged loan letters and fake bank notices.",
+                      18, "intel", res["ifsc"])
+                it["context"] = f"{it.get('context', '')} · INVALID (not in RBI directory)".strip(" ·")
+            elif res.get("valid"):
+                branch_str = ", ".join(p for p in (res.get("branch"), res.get("city"), res.get("state")) if p)
+                it["context"] = f"{res.get('bank', '')} · {branch_str}".strip(" ·")[:280]
+        if ifsc_out:
+            live_osint["ifsc"] = ifsc_out
+
+        # Collect live blockchain wallet intelligence
+        crypto_out = []
+        for it in crypto_items:
+            try:
+                res = fut_crypto[it["value"]].result(timeout=5.5)
+            except Exception:
+                res = None
+            if not res:
+                continue
+            crypto_out.append(res)
+            if "usdt_trc20_balance" in res:
+                it["context"] = (
+                    f"{res['network']} · {res['usdt_trc20_balance']:,.2f} USDT · {res['trx_balance']:,.2f} TRX"
+                    + (f" · created {res['created']}" if res.get("created") else "")
+                )[:280]
+            elif "balance_btc" in res:
+                it["context"] = (
+                    f"Bitcoin · {res['tx_count']} tx · bal {res['balance_btc']} BTC (rx {res['total_received_btc']} BTC)"
+                )[:280]
+            elif "eth_balance" in res:
+                it["context"] = f"Ethereum · {res['outgoing_tx_count']} tx · bal {res['eth_balance']} ETH"[:280]
+        if crypto_out:
+            live_osint["crypto"] = crypto_out
+
+        # Collect Telegram public channel/bot preview metadata
+        tg_out = []
+        for it in tg_items:
+            try:
+                res = fut_tg[it["value"]].result(timeout=4.0)
+            except Exception:
+                res = None
+            if not res:
+                continue
+            tg_out.append(res)
+            parts = [p for p in (res.get("kind"), res.get("title"), res.get("members_or_status")) if p]
+            if parts:
+                it["context"] = (it.get("context", "") + " · " + " — ".join(parts)).strip(" ·")[:280]
+        if tg_out:
+            live_osint["telegram"] = tg_out
+
+        # Collect APK CIRCL NSRL reference hash & live C2 server intelligence
+        if fut_hash is not None:
+            try:
+                hl = fut_hash.result(timeout=4.5)
+                if hl:
+                    live_osint["hashlookup"] = hl
+                    if hl.get("known_reference"):
+                        f.add("apk.nsrl_known", "SHA-256 matches known NIST NSRL / CIRCL reference file",
+                              f"Matched {hl.get('file_name') or 'known binary'} in {hl.get('source', 'CIRCL NSRL')}.",
+                              -15, "intel", apk_sha[:16])
+            except Exception:
+                pass
+
+        c2_rows = []
+        existing_ips = {it.get("value") for it in iocs if it.get("etype") == "ip"}
+        for dom, fut in fut_c2_dom.items():
+            try:
+                enr = (fut.result(timeout=6.0) or {}).get("data") or {}
+            except Exception:
+                enr = {}
+            if not enr:
+                continue
+            who = enr.get("whois") or {}
+            host_ip = enr.get("hosting") or {}
+            c2_rows.append({"target": dom, "type": "domain", "whois": who, "hosting": host_ip, "dns": enr.get("dns") or {}})
+            ip_val = host_ip.get("ip")
+            if ip_val and ip_val not in existing_ips:
+                existing_ips.add(ip_val)
+                iocs.append({
+                    "etype": "ip",
+                    "value": ip_val,
+                    "display": ip_val,
+                    "context": f"APK C2 server ({dom}) · {host_ip.get('org', '')} {host_ip.get('country', '')}".strip(),
+                })
+            age = who.get("age_days") if who.get("found") else None
+            if age is not None and age < 60:
+                f.add("apk.c2_new_domain", f"APK contacts newly registered domain ({age}d old)",
+                      f"Embedded endpoint {dom} was registered on {(who.get('created') or '')[:10]} ({who.get('registrar', '')}).",
+                      18, "network", dom)
+            bad_tags = sorted({t.lower() for t in (host_ip.get("shodan_tags") or [])} & {"malware", "c2", "compromised", "botnet"})
+            if bad_tags:
+                f.add("apk.c2_shodan", "APK backend IP flagged in Shodan threat telemetry",
+                      f"{dom} resolves to {ip_val} ({', '.join(bad_tags)}).", 25, "intel", f"{dom} -> {ip_val}")
+
+        for ip_val, fut in fut_c2_ip.items():
+            try:
+                host_ip = fut.result(timeout=5.5) or {}
+            except Exception:
+                host_ip = {}
+            if not host_ip:
+                continue
+            c2_rows.append({"target": ip_val, "type": "ip", "whois": {}, "hosting": host_ip, "dns": {}})
+            bad_tags = sorted({t.lower() for t in (host_ip.get("shodan_tags") or [])} & {"malware", "c2", "compromised", "botnet"})
+            if bad_tags:
+                f.add("apk.c2_shodan_ip", "Hard-coded APK IP flagged in Shodan threat telemetry",
+                      f"IP {ip_val} carries Shodan tags: {', '.join(bad_tags)}.", 25, "intel", ip_val)
+        if c2_rows:
+            live_osint["apk_c2"] = c2_rows
+
+    if live_osint:
+        result.setdefault("details", {})["live_osint"] = live_osint
+    result["iocs"] = iocs
+    return result
 
 
 def _apply_ai(kind: str, result: dict, *, text_hint: str, run_live: bool) -> dict:
@@ -51,6 +232,7 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
                         "email_headers": r["email_headers"], "links": r["links"]}
         r["fingerprint_text"] = r["body"]
         r["evidence"] = [("Original message text", "message.txt", text.encode("utf-8"), "text/plain; charset=utf-8")]
+        _enrich_live(kind, r, run_live=run_live)
         return _apply_ai(kind, r, text_hint=text, run_live=run_live)
     if kind == "url":
         if not url.strip():
@@ -59,6 +241,7 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
             r = apk_mod.analyze_store_link(url, run_live=run_live)
             r["details"] = {"store": r["meta"]}
             r["evidence"] = []
+            _enrich_live("apk", r, run_live=run_live)
             return _apply_ai("apk", r, text_hint=url, run_live=run_live)
         rep = urlscan.analyze(url, run_live=run_live)
         found = ioc_mod.extract(rep["url"], "submitted URL")
@@ -67,11 +250,12 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
         hosting = rep["net"].get("hosting") or {}
         if hosting.get("ip"):
             found.append({"etype": "ip", "value": hosting["ip"], "display": hosting["ip"],
-                          "context": f"hosting · {hosting.get('org', '')} {hosting.get('country', '')}".strip()})
+                          "context": f"hosting · {hosting.get('asn', '')} {hosting.get('org', '')} {hosting.get('country', '')}".strip()})
         body = rep["net"].pop("_body", b"")
         ev = [("Landing page snapshot (HTML)", "landing.html", body, "text/html")] if body else []
         r = {"findings": rep["findings"], "iocs": found, "category": _url_category(rep["findings"]),
              "details": {"url": rep["url"], "info": rep["info"], "net": rep["net"]}, "evidence": ev}
+        _enrich_live(kind, r, run_live=run_live)
         return _apply_ai(kind, r, text_hint=url, run_live=run_live)
     if kind == "website":
         r = web_mod.analyze(url=url.strip() or None, upload=upload, run_live=run_live)
@@ -79,6 +263,7 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
         r["fingerprint_text"] = r.get("page", {}).get("excerpt", "")
         r["evidence"] = r.pop("_evidence", [])
         hint = url.strip() or r["fingerprint_text"] or (upload[0] if upload else "")
+        _enrich_live(kind, r, run_live=run_live)
         return _apply_ai(kind, r, text_hint=hint, run_live=run_live)
     if kind == "apk":
         if upload:
@@ -88,11 +273,13 @@ def analyse(kind: str, *, text: str = "", channel: str = "sms", sender: str = ""
             r = apk_mod.analyze_apk(name, data)
             r["details"] = {"apk": r["meta"]}
             r["evidence"] = [("Submitted APK", name, data, "application/vnd.android.package-archive")]
+            _enrich_live(kind, r, run_live=run_live)
             return _apply_ai(kind, r, text_hint=name, run_live=run_live)
         if url.strip():
             r = apk_mod.analyze_store_link(url.strip(), run_live=run_live)
             r["details"] = {"store": r["meta"]}
             r["evidence"] = []
+            _enrich_live(kind, r, run_live=run_live)
             return _apply_ai(kind, r, text_hint=url, run_live=run_live)
         raise ValueError("Upload an APK file or enter an app-store link.")
     raise ValueError("Unknown analysis type")

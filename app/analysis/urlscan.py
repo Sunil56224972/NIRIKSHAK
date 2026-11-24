@@ -8,6 +8,7 @@ from urllib.parse import urlsplit, unquote
 
 from .. import config
 from . import netintel
+from . import osint
 from .brands import BRANDS, FREE_HOSTING, MULTI_SUFFIXES, RISKY_TLDS, SHORTENERS, TRUSTED_SUFFIXES
 from .iocs import IPV4_RE, refang
 from .scoring import Findings
@@ -221,9 +222,13 @@ def live(url: str, info: dict) -> tuple[Findings, dict]:
         return f, net
 
     is_ip = bool(IPV4_RE.fullmatch(host))
+    is_off = bool(info.get("official_brand"))
 
     def job_dns():
         return netintel.resolve(host)
+
+    def job_doh():
+        return None if is_ip else osint.dns_forensics(host)
 
     def job_rdap():
         return None if is_ip else netintel.rdap_domain(reg)
@@ -234,9 +239,12 @@ def live(url: str, info: dict) -> tuple[Findings, dict]:
     def job_tls():
         return netintel.tls_info(host)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futs = {"dns": pool.submit(job_dns), "rdap": pool.submit(job_rdap),
-                "http": pool.submit(job_fetch), "tls": pool.submit(job_tls)}
+    def job_ct():
+        return None if (is_ip or is_off) else osint.ct_subdomains(reg)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futs = {"dns": pool.submit(job_dns), "doh": pool.submit(job_doh), "rdap": pool.submit(job_rdap),
+                "http": pool.submit(job_fetch), "tls": pool.submit(job_tls), "ct": pool.submit(job_ct)}
         results = {}
         for k, fut in futs.items():
             try:
@@ -246,21 +254,48 @@ def live(url: str, info: dict) -> tuple[Findings, dict]:
             except Exception as exc:  # network failures are evidence too
                 net["errors"][k] = f"{exc.__class__.__name__}: {str(exc)[:160]}"
 
-    ips = results.get("dns") or []
+    doh = results.get("doh") or {}
+    if doh:
+        net["dns_records"] = doh
+        disp_cname = doh.get("disposable_cname")
+        if disp_cname and not is_off and not any(host == h or host.endswith("." + h) for h in FREE_HOSTING):
+            f.add("net.cname_disposable", "Custom domain aliases to disposable hosting / tunnel",
+                  f"{host} CNAMEs to {disp_cname}, hiding throw-away hosting behind a custom domain.",
+                  12, "network", disp_cname)
+
+    ips = results.get("dns") or doh.get("a") or []
     net["dns"] = ips
-    if not ips and "dns" in results:
+    if not ips and ("dns" in results or doh):
         f.add("net.nxdomain", "Domain does not resolve",
               "No DNS A/AAAA record. The site may already be taken down, or is only live during a campaign.",
               10, "network", host)
 
     if ips:
         try:
-            net["hosting"] = netintel.rdap_ip(ips[0]) if netintel.is_public_ip(ips[0]) else {"ip": ips[0]}
+            hosting = osint.inspect_ip(ips[0]) if netintel.is_public_ip(ips[0]) else {"ip": ips[0]}
+            net["hosting"] = hosting
+            tags = {t.lower() for t in (hosting.get("shodan_tags") or [])}
+            bad_tags = sorted(tags & {"malware", "c2", "compromised", "botnet", "tor", "phishing"})
+            if bad_tags and not is_off:
+                f.add("net.shodan_threat", "Hosting IP flagged in Shodan threat telemetry",
+                      f"IP {ips[0]} carries active Shodan tags: {', '.join(bad_tags)}.",
+                      28, "intel", f"{ips[0]} ({', '.join(bad_tags)})")
+            suspicious_ports = sorted(set(hosting.get("ports") or []) & {21, 23, 445, 1433, 3306, 3389, 4444, 5555, 5900, 6379, 8888, 9001})
+            if len(suspicious_ports) >= 2 and not is_off:
+                f.add("net.exposed_ports", "Hosting server exposes unusual admin / database ports",
+                      f"Shodan InternetDB reports open ports {', '.join(str(p) for p in suspicious_ports[:8])} on {ips[0]}.",
+                      6, "network", ", ".join(str(p) for p in suspicious_ports[:6]))
         except Exception as exc:
             net["errors"]["hosting"] = f"{exc.__class__.__name__}"
 
+    ct = results.get("ct") or {}
+    if ct and ct.get("cert_count"):
+        net["ct"] = ct
+
     rd = results.get("rdap")
     if rd is not None:
+        if rd.get("found") and not rd.get("nameservers") and doh.get("ns"):
+            rd["nameservers"] = doh["ns"]
         net["whois"] = rd
         age = rd.get("age_days") if rd.get("found") else None
         if rd.get("found") is False:

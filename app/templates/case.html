@@ -111,6 +111,111 @@
     </div>
   </section>
 
+  {% set lo = d.live_osint or {} %}
+  {% set trai = (d.sender or {}).trai if d.sender else none %}
+  {% if trai or lo.ifsc or lo.crypto or lo.apk_c2 or lo.telegram or lo.hashlookup %}
+  <section class="panel">
+    <header>
+      <h2>Live OSINT &amp; financial attribution</h2>
+      <span class="aside">RBI IFSC · Blockchain RPC · Shodan · RIPEstat · TRAI DLT</span>
+    </header>
+    <div class="body">
+      {% if trai %}
+      <h3>TRAI DLT SMS header attribution</h3>
+      <table class="kv">
+        <tr><th>Header</th><td class="mono">{{ trai.header }}</td></tr>
+        <tr><th>Telecom operator (TSP)</th><td><b>{{ trai.operator }}</b> ({{ trai.operator_code }})</td></tr>
+        <tr><th>Origin telecom circle</th><td><b>{{ trai.circle }}</b> ({{ trai.circle_code }})</td></tr>
+        <tr><th>Message stream</th><td>{{ trai.stream }}</td></tr>
+        <tr><th>Nodal escalation</th><td class="mini">{{ trai.nodal_hint }}</td></tr>
+      </table>
+      {% endif %}
+
+      {% if lo.ifsc %}
+      <h3>RBI IFSC branch verification (live directory)</h3>
+      <table class="grid">
+        <tr><th>IFSC</th><th>Bank &amp; branch</th><th>Registered branch address</th><th>Rails</th></tr>
+        {% for b in lo.ifsc %}
+        <tr>
+          <td class="mono nowrap">{{ b.ifsc }}</td>
+          {% if b.valid %}
+          <td><b>{{ b.bank }}</b><br><span class="dim">{{ b.branch }}</span></td>
+          <td class="mini">{{ b.address }}{% if b.city or b.state %}<br><b>{{ b.city }}{% if b.district and b.district != b.city %}, {{ b.district }}{% endif %}, {{ b.state }}</b>{% endif %}{% if b.contact %} · Tel: <span class="mono">{{ b.contact }}</span>{% endif %}</td>
+          <td class="mini nowrap">{% if b.upi %}UPI {% endif %}{% if b.imps %}IMPS {% endif %}{% if b.neft %}NEFT {% endif %}{% if b.rtgs %}RTGS{% endif %}</td>
+          {% else %}
+          <td colspan="3" class="bad-txt"><b>Not found in RBI IFSC directory</b> — likely fabricated / forged IFSC code.</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if lo.crypto %}
+      <h3>Live blockchain wallet telemetry</h3>
+      <table class="grid">
+        <tr><th>Network</th><th>Wallet address</th><th>Live on-chain balance &amp; activity</th></tr>
+        {% for w in lo.crypto %}
+        <tr>
+          <td class="nowrap">{{ w.network }}</td>
+          <td class="mono">{{ w.address }}</td>
+          <td class="mini">
+            {% if w.usdt_trc20_balance is defined %}
+              <b>{{ '{:,.2f}'.format(w.usdt_trc20_balance) }} USDT</b> · {{ '{:,.2f}'.format(w.trx_balance) }} TRX
+              {% if w.created %} · created {{ w.created }}{% endif %}
+              {% if w.last_activity %} · last op {{ w.last_activity }}{% endif %}
+              {% if w.note %}<div class="dim">{{ w.note }}</div>{% endif %}
+            {% elif w.balance_btc is defined %}
+              <b>{{ w.balance_btc }} BTC</b> current · {{ w.total_received_btc }} BTC total received across <b>{{ w.tx_count }}</b> tx(s)
+            {% elif w.eth_balance is defined %}
+              <b>{{ w.eth_balance }} ETH</b> current · <b>{{ w.outgoing_tx_count }}</b> outgoing tx(s)
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if lo.apk_c2 %}
+      <h3>APK backend / C2 server live attribution</h3>
+      <table class="grid">
+        <tr><th>Embedded target</th><th>Resolved IP &amp; ASN</th><th>Abuse contact &amp; exposure</th></tr>
+        {% for c2 in lo.apk_c2 %}
+        {% set ch = c2.hosting or {} %}{% set cw = c2.whois or {} %}
+        <tr>
+          <td class="mono">{{ c2.target }}{% if cw.found %}<br><span class="dim">Reg: {{ cw.registrar }} ({{ cw.age_days }}d old)</span>{% endif %}</td>
+          <td class="mini"><span class="mono">{{ ch.ip or '—' }}</span>{% if ch.asn %} · <span class="mono">{{ ch.asn }}</span>{% endif %}<br>{{ ch.org or ch.isp or '' }} {% if ch.location or ch.country %}<span class="dim">({{ ch.location or ch.country }})</span>{% endif %}</td>
+          <td class="mini">
+            {% if ch.abuse_contacts %}Abuse: <span class="mono">{{ ch.abuse_contacts|join(', ') }}</span><br>{% elif cw.registrar_abuse_email %}Abuse: <span class="mono">{{ cw.registrar_abuse_email }}</span><br>{% endif %}
+            {% if ch.ports %}Ports: <span class="mono">{{ ch.ports|join(', ') }}</span>{% endif %}
+            {% if ch.shodan_tags %} · Tags: {{ ch.shodan_tags|join(', ') }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if lo.telegram %}
+      <h3>Telegram channel / handle preview</h3>
+      <table class="grid">
+        <tr><th>Handle</th><th>Type</th><th>Public profile metadata</th></tr>
+        {% for tg in lo.telegram %}
+        <tr>
+          <td class="mono nowrap">{{ tg.handle }}</td>
+          <td class="nowrap">{{ tg.kind or 'Telegram handle' }}</td>
+          <td class="mini">{% if tg.title %}<b>{{ tg.title }}</b>{% endif %}{% if tg.members_or_status %} · {{ tg.members_or_status }}{% endif %}{% if tg.description %}<div class="dim">{{ tg.description }}</div>{% endif %}{% if not tg.title and not tg.members_or_status %}<span class="dim">No public preview exposed (private account or invite).</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+
+      {% if lo.hashlookup %}
+      <h3>CIRCL NSRL reference hash check</h3>
+      <p class="mini">{% if lo.hashlookup.known_reference %}<span class="ok-txt">Matched known reference file:</span> <span class="mono">{{ lo.hashlookup.file_name }}</span> ({{ lo.hashlookup.source }}){% else %}SHA-256 is <b>not</b> in NIST NSRL / CIRCL known-good software sets (custom or unindexed build).{% endif %}</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if linked or (r.intel and (r.intel.similar or r.intel.blocklist)) %}
   <section class="panel">
     <header><h2>Links to other records</h2></header>
@@ -305,7 +410,7 @@
     <header><h2>Engine</h2></header>
     <div class="body mini">
       Analysed {{ r.engine.analysed_at|ist('%d %b %Y %H:%M:%S') if r.engine }}<br>
-      Live checks: {{ 'on' if r.engine and r.engine.live_checks else 'off' }} · Safe Browsing: {{ 'on' if r.engine and r.engine.gsb else 'not configured' }}<br>
+      Live checks: {{ 'on (DNS DoH · RDAP/WHOIS · Shodan · RBI IFSC · Chain RPC)' if r.engine and r.engine.live_checks else 'off' }} · Safe Browsing: {{ 'on' if r.engine and r.engine.gsb else 'not configured' }}<br>
       AI triage: {{ r.engine.groq_model if r.engine and r.engine.groq_ai else 'off' }}<br>
       Input SHA-256: <span class="mono">{{ c.content_sha256 }}</span>
     </div>
